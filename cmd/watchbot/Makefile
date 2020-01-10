@@ -1,6 +1,6 @@
-default:	secbot
+default:	watchbot
 
-secbot:	*.go ../../watchbot/*.go ../../telegram/*.go ../../db/*.go
+watchbot:	*.go ../../bot ../../intl/*.go
 	GOPATH=$(realpath ../../)
-	go get github.com/op/go-logging
+	go get github.com/op/go-logging github.com/zeebo/bencode github.com/go-telegram-bot-api/telegram-bot-api
 	go build
