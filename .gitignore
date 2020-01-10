@@ -1,0 +1,6 @@
+/bin
+/pkg
+/src
+/*.log
+/.idea
+/configs/config.json
