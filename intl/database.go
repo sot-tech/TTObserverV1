@@ -1,42 +1,197 @@
+/*
+ * BSD-3-Clause
+ * Copyright 2020 sot (aka PR_713, C_rho_272)
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 1. Redistributions of source code must retain the above copyright notice,
+ * this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ * this list of conditions and the following disclaimer in the documentation and/or
+ * other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ * may be used to endorse or promote products derived from this software without
+ * specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ */
+
 package intl
+
+import (
+	"database/sql"
+	_ "github.com/mattn/go-sqlite3"
+	"strconv"
+)
 
 type Database struct {
 	Path string
 }
 
-func (db *Database) GetChats() []int64 {
-	return []int64{}
+const(
+
+	DBDriver = "sqlite3"
+
+	selectChats = "SELECT ID FROM TT_CHAT"
+	insertChat  = "INSERT INTO TT_CHAT(ID) VALUES ($1)"
+	delChat     = "DELETE FROM TT_CHAT WHERE ID = $1"
+
+	selectAdmins = "SELECT ID FROM TT_ADMIN"
+	insertAdmin = "INSERT INTO TT_ADMIN(ID) VALUES ($1)"
+	delAdmin = "DELETE FROM TT_ADMIN WHERE ID = $1"
+
+	selectTorrentSize = "SELECT FULL_SIZE FROM TT_TORRENT WHERE NAME = $1"
+	insertOrUpdateTorrent = "INSERT INTO TT_TORRENT(NAME, FULL_SIZE) VALUES ($1, $2) ON CONFLICT DO UPDATE SET FULL_SIZE = EXCLUDED.FULL_SIZE"
+
+	selectConfig = "SELECT VALUE FROM TT_CONFIG WHERE NAME = $1"
+	insertOrUpdateConfig = "INSERT INTO TT_CONFIG(NAME, VALUE) VALUES ($1, $2) ON CONFLICT DO UPDATE SET VALUE = EXCLUDED.VALUE"
+
+	confCrawlOffset = "CRAWL_OFFSET"
+	confTgOffset = "TG_OFFSET"
+)
+
+func (db *Database) getIntArray(query string, args ... interface{}) ([]int64, error){
+	var arr []int64
+	var con *sql.DB
+	var err error
+	con, err = sql.Open(DBDriver, db.Path)
+	if err == nil && con != nil{
+		defer con.Close()
+		var rows *sql.Rows
+		rows, err = con.Query(query, args)
+		if err == nil && rows != nil{
+			for rows.Next() {
+				var element int64
+				if err := rows.Scan(&element); err == nil{
+					arr = append(arr, element)
+				} else{
+					logger.Errorf("Unable to append row value: %v", err)
+				}
+			}
+		}
+	}
+	return arr, err
 }
 
-func (db *Database) InsertChat(chat int64) {
-
+func (db *Database) GetChats() ([]int64, error) {
+	return db.getIntArray(selectChats)
 }
 
-func (db *Database) DeleteChat(chat int64) {
-
+func (db *Database) execNoResult(query string, args ... interface{}) error {
+	var con *sql.DB
+	var err error
+	con, err = sql.Open(DBDriver, db.Path)
+	if err == nil && con != nil{
+		defer con.Close()
+		_, err = con.Exec(query, args)
+	}
+	return err
 }
 
-func (db *Database) GetTorrentLength(torrent string) uint64 {
-	return 0
+func (db *Database) AddChat(chat int64) error {
+	return db.execNoResult(insertChat, chat)
 }
 
-func (db *Database) UpsertTorrent(name string, length uint64) {
-
+func (db *Database) DelChat(chat int64) error {
+	return db.execNoResult(delChat, chat)
 }
 
-func (db *Database) GetCrawlOffset() uint {
-	return 0
+func (db *Database) GetAdmins() ([]int64, error) {
+	return db.getIntArray(selectAdmins)
 }
 
-func (db *Database) UpsertCrawlOffset(offset uint){
-
+func (db *Database) AddAdmin(id int64) error {
+	return db.execNoResult(insertAdmin, id)
 }
 
-func (db *Database) GetTgOffset() int {
-	return 0
+func (db *Database) DelAdmin(id int64) error {
+	return db.execNoResult(delAdmin, id)
 }
 
-func (db *Database) UpsertTgOffset(offset int){
-
+func (db *Database) GetTorrentSize(torrent string) (uint64, error) {
+	var val uint64
+	var con *sql.DB
+	var err error
+	con, err = sql.Open(DBDriver, db.Path)
+	if err == nil && con != nil{
+		defer con.Close()
+		var rows *sql.Rows
+		rows, err = con.Query(selectTorrentSize, torrent)
+		if err == nil && rows != nil{
+			if rows.Next() {
+				err = rows.Scan(&val)
+			}
+		}
+	}
+	return val, err
 }
 
+func (db *Database) UpdateTorrent(name string, size uint64) error {
+	return db.execNoResult(insertOrUpdateTorrent, name, size)
+}
+
+func (db *Database) getConfigValue(name string) (string, error){
+	var val string
+	var con *sql.DB
+	var err error
+	con, err = sql.Open(DBDriver, db.Path)
+	if err == nil && con != nil{
+		defer con.Close()
+		var rows *sql.Rows
+		rows, err = con.Query(selectConfig, name)
+		if err == nil && rows != nil{
+			if rows.Next() {
+				err = rows.Scan(&val)
+			}
+		}
+	}
+	return val, err
+}
+
+func (db *Database) updateConfigValue(name, val string) error{
+	return db.execNoResult(insertOrUpdateConfig, name, val)
+}
+
+func (db *Database) GetCrawlOffset() (uint, error) {
+	var res uint64
+	var val string
+	var err error
+	if val, err = db.getConfigValue(confCrawlOffset); err == nil {
+		res, err = strconv.ParseUint(val, 10, 64)
+	}
+	return uint(res), err
+}
+
+func (db *Database) UpdateCrawlOffset(offset uint) error {
+	return db.updateConfigValue(confCrawlOffset, strconv.FormatUint(uint64(offset), 10))
+}
+
+func (db *Database) GetTgOffset() (int, error) {
+	var res int64
+	var val string
+	var err error
+	if val, err = db.getConfigValue(confCrawlOffset); err == nil {
+		res, err = strconv.ParseInt(val, 10, 64)
+	}
+	return int(res), err
+}
+
+func (db *Database) UpdateTgOffset(offset int) error {
+	return db.updateConfigValue(confTgOffset, strconv.FormatUint(uint64(offset), 10))
+}
+
+func (db *Database) CheckConnection() error {
+	con, err := sql.Open("sqlite3", db.Path)
+	if err == nil{
+		defer con.Close()
+	}
+	return err
+}
