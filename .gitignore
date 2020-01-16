@@ -3,6 +3,5 @@
 /src
 /*.log
 /.idea
-/tt.db
-/tt.json
-/config.json
+/conf/tt.db
+/conf/tt.json

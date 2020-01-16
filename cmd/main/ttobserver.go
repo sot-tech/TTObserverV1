@@ -27,7 +27,7 @@
 package main
 
 import (
-	"../../observer"
+	"../.."
 	"flag"
 	"github.com/op/go-logging"
 	"io"
@@ -42,7 +42,7 @@ func main() {
 		logger.Fatal("Observer file not set")
 	}
 	filename := args[0]
-	crawler, err := observer.ReadConfig(filename)
+	crawler, err := TTObserver.ReadConfig(filename)
 	if err != nil {
 		logger.Fatal(err)
 	}

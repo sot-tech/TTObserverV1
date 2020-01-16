@@ -27,9 +27,10 @@
 package intl
 
 import (
+	"errors"
 	"fmt"
 	"github.com/zeebo/bencode"
-	"io"
+	"net/http"
 )
 
 type Torrent struct {
@@ -54,10 +55,27 @@ type Torrent struct {
 	URL string `bencode:"-"`
 }
 
-func ReadTorrent(stream io.Reader) (*Torrent, error) {
-	var torrent Torrent
-	err := bencode.NewDecoder(stream).Decode(&torrent)
-	return &torrent, err
+func GetTorrent(url string) (*Torrent, error){
+	var res *Torrent
+	var err error
+	if resp, err := http.Get(url); err == nil && resp != nil && resp.StatusCode < 400 {
+		var torrent Torrent
+		err := bencode.NewDecoder(resp.Body).Decode(&torrent)
+		if err == nil{
+			res = &torrent
+		}
+	} else{
+		var errMsg string
+		if err != nil {
+			errMsg = err.Error()
+		} else if resp == nil {
+			errMsg = "empty response"
+		} else {
+			errMsg = resp.Status
+		}
+		err = errors.New(errMsg)
+	}
+	return res, err
 }
 
 func (t *Torrent) FullSize() uint64 {
@@ -74,9 +92,11 @@ func (t *Torrent) FullSize() uint64 {
 	return fullLen
 }
 
-func SizeToStr(size uint64) string {
+func (t *Torrent) StringSize() string{
 	const base = 1024
 	const suff = "KMGTPEZY"
+	var size uint64
+	size = t.FullSize()
 	var res string
 	if size < base {
 		res = fmt.Sprintf("%d B", size)
