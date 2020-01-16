@@ -1,0 +1,26 @@
+{
+  "log": {
+    "file": "tt.log",
+    "level": "DEBUG"
+  },
+  "crawler": {
+    "url": "http://site.local/uploads/%d",
+    "threshold": 10,
+    "errorthreshold": 10,
+    "delay": 20
+  },
+  "sizethreshold": 5,
+  "telegramtoken": "123456:1234567890abcdef",
+  "adminotpseed": "BASE32LONGLONGSEEDSTRING",
+  "dbfile": "tt.db",
+  "msg": {
+    "announce": "*New torrent ${action}*\n`${name}:${size}`\n[Download](${url})\n",
+    "n1000": "New GET ${index}",
+    "added": "Added",
+    "updated": "Updated",
+    "error": "Target error, try ${try}: ${msg}"
+  },
+  "msgreplacements": {
+    "_": ""
+  }
+}

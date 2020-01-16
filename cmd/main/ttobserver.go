@@ -30,13 +30,14 @@ import (
 	"../../observer"
 	"flag"
 	"github.com/op/go-logging"
+	"io"
+	"os"
 )
-
-var logger = logging.MustGetLogger("main")
 
 func main() {
 	flag.Parse()
 	args := flag.Args()
+	logger := logging.MustGetLogger("main")
 	if len(args) == 0 {
 		logger.Fatal("Observer file not set")
 	}
@@ -45,5 +46,33 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
-	crawler.Engage()
+
+	var outputWriter io.Writer
+	if crawler.Log.File == "" {
+		outputWriter = os.Stderr
+	} else {
+		outputWriter, err = os.OpenFile(crawler.Log.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
+	}
+	if err == nil {
+		backend := logging.AddModuleLevel(
+			logging.NewBackendFormatter(
+				logging.NewLogBackend(outputWriter, "", 0),
+				logging.MustStringFormatter("%{time:15:04:05.000}\t%{shortfile}\t%{shortfunc}\t%{level}:\t%{message}")))
+		var level logging.Level
+		if level, err = logging.LogLevel(crawler.Log.Level); err != nil {
+			println(err)
+			level = logging.INFO
+		}
+		backend.SetLevel(level, "")
+		logging.SetBackend(backend)
+	} else{
+		println(err)
+	}
+
+	waiter := make(chan bool)
+	go func() {
+		crawler.Engage()
+		waiter <- true
+	}()
+	<-waiter
 }

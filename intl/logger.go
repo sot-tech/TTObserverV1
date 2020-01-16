@@ -28,4 +28,4 @@ package intl
 
 import "github.com/op/go-logging"
 
-var logger = logging.MustGetLogger("intl")
+var Logger = logging.MustGetLogger("observer")

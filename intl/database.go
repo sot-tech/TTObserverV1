@@ -28,12 +28,13 @@ package intl
 
 import (
 	"database/sql"
+	"errors"
 	_ "github.com/mattn/go-sqlite3"
 	"strconv"
 )
 
 type Database struct {
-	Path string
+	Con  *sql.DB
 }
 
 const(
@@ -49,31 +50,40 @@ const(
 	delAdmin = "DELETE FROM TT_ADMIN WHERE ID = $1"
 
 	selectTorrentSize = "SELECT FULL_SIZE FROM TT_TORRENT WHERE NAME = $1"
-	insertOrUpdateTorrent = "INSERT INTO TT_TORRENT(NAME, FULL_SIZE) VALUES ($1, $2) ON CONFLICT DO UPDATE SET FULL_SIZE = EXCLUDED.FULL_SIZE"
+	insertOrUpdateTorrent = "INSERT INTO TT_TORRENT(NAME, FULL_SIZE) VALUES ($1, $2) ON CONFLICT(NAME) DO UPDATE SET FULL_SIZE = EXCLUDED.FULL_SIZE"
 
 	selectConfig = "SELECT VALUE FROM TT_CONFIG WHERE NAME = $1"
-	insertOrUpdateConfig = "INSERT INTO TT_CONFIG(NAME, VALUE) VALUES ($1, $2) ON CONFLICT DO UPDATE SET VALUE = EXCLUDED.VALUE"
+	insertOrUpdateConfig = "INSERT INTO TT_CONFIG(NAME, VALUE) VALUES ($1, $2) ON CONFLICT(NAME) DO UPDATE SET VALUE = EXCLUDED.VALUE"
 
 	confCrawlOffset = "CRAWL_OFFSET"
 	confTgOffset = "TG_OFFSET"
 )
 
+func (db * Database) checkConnection() error{
+	var err error
+	if db.Con == nil{
+		err = errors.New("connection not initialized")
+	} else{
+		err = db.Con.Ping()
+	}
+	return err
+}
+
 func (db *Database) getIntArray(query string, args ... interface{}) ([]int64, error){
 	var arr []int64
-	var con *sql.DB
 	var err error
-	con, err = sql.Open(DBDriver, db.Path)
-	if err == nil && con != nil{
-		defer con.Close()
+	err = db.checkConnection()
+	if err == nil{
 		var rows *sql.Rows
-		rows, err = con.Query(query, args)
+		rows, err = db.Con.Query(query, args...)
 		if err == nil && rows != nil{
+			defer rows.Close()
 			for rows.Next() {
 				var element int64
 				if err := rows.Scan(&element); err == nil{
 					arr = append(arr, element)
 				} else{
-					logger.Errorf("Unable to append row value: %v", err)
+					Logger.Errorf("Unable to append row value: %v", err)
 				}
 			}
 		}
@@ -86,12 +96,10 @@ func (db *Database) GetChats() ([]int64, error) {
 }
 
 func (db *Database) execNoResult(query string, args ... interface{}) error {
-	var con *sql.DB
 	var err error
-	con, err = sql.Open(DBDriver, db.Path)
-	if err == nil && con != nil{
-		defer con.Close()
-		_, err = con.Exec(query, args)
+	err = db.checkConnection()
+	if err == nil{
+		_, err = db.Con.Exec(query, args...)
 	}
 	return err
 }
@@ -118,14 +126,13 @@ func (db *Database) DelAdmin(id int64) error {
 
 func (db *Database) GetTorrentSize(torrent string) (uint64, error) {
 	var val uint64
-	var con *sql.DB
 	var err error
-	con, err = sql.Open(DBDriver, db.Path)
-	if err == nil && con != nil{
-		defer con.Close()
+	err = db.checkConnection()
+	if err == nil{
 		var rows *sql.Rows
-		rows, err = con.Query(selectTorrentSize, torrent)
+		rows, err = db.Con.Query(selectTorrentSize, torrent)
 		if err == nil && rows != nil{
+			defer rows.Close()
 			if rows.Next() {
 				err = rows.Scan(&val)
 			}
@@ -140,14 +147,13 @@ func (db *Database) UpdateTorrent(name string, size uint64) error {
 
 func (db *Database) getConfigValue(name string) (string, error){
 	var val string
-	var con *sql.DB
 	var err error
-	con, err = sql.Open(DBDriver, db.Path)
-	if err == nil && con != nil{
-		defer con.Close()
+	err = db.checkConnection()
+	if err == nil{
 		var rows *sql.Rows
-		rows, err = con.Query(selectConfig, name)
+		rows, err = db.Con.Query(selectConfig, name)
 		if err == nil && rows != nil{
+			defer rows.Close()
 			if rows.Next() {
 				err = rows.Scan(&val)
 			}
@@ -188,10 +194,17 @@ func (db *Database) UpdateTgOffset(offset int) error {
 	return db.updateConfigValue(confTgOffset, strconv.FormatUint(uint64(offset), 10))
 }
 
-func (db *Database) CheckConnection() error {
-	con, err := sql.Open("sqlite3", db.Path)
+func (db *Database) Connect(path string) error {
+	var err error
+	db.Con, err = sql.Open(DBDriver, path)
 	if err == nil{
-		defer con.Close()
+		err = db.checkConnection()
 	}
 	return err
+}
+
+func (db *Database) Close(){
+	if db.Con != nil{
+		_ = db.Con.Close()
+	}
 }

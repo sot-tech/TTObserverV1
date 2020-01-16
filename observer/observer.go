@@ -30,36 +30,33 @@ import (
 	"../intl"
 	"encoding/json"
 	"fmt"
-	"github.com/op/go-logging"
-
-	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
-	"os"
 	"time"
 )
-
-var logger = logging.MustGetLogger("bot")
 
 type Observer struct {
 	Log struct {
 		File  string `json:"file"`
 		Level string `json:"level"`
-	}
+	} `json:"log"`
 	Crawler struct {
-		URL       string `json:"url"`
-		Threshold uint   `json:"threshold"`
-		Delay     uint   `json:"delay"`
+		URL            string `json:"url"`
+		Threshold      uint   `json:"threshold"`
+		ErrorThreshold uint   `json:"errorthreshold"`
+		Delay          uint   `json:"delay"`
 	} `json:"crawler"`
 	SizeThreshold uint   `json:"sizethreshold"`
 	TelegramToken string `json:"telegramtoken"`
+	AdminOTPSeed  string `json:"adminotpseed"`
 	DBFile        string `json:"dbfile"`
 	Messages      struct {
 		Announce string `json:"announce"`
 		N1000    string `json:"n1000"`
 		Added    string `json:"added"`
 		Updated  string `json:"updated"`
+		Error    string `json:"error"`
 	} `json:"msg"`
 	MessageReplacements map[string]string `json:"msgreplacements"`
 }
@@ -68,112 +65,115 @@ func ReadConfig(path string) (*Observer, error) {
 	var config Observer
 	confData, err := ioutil.ReadFile(path)
 	if err == nil {
-		if json.Unmarshal(confData, &config) == nil {
-			var outputWriter io.Writer
-			if config.Log.File == "" {
-				outputWriter = os.Stderr
-			} else {
-				outputWriter, err = os.OpenFile(path, os.O_CREATE|os.O_APPEND, 0640)
-			}
-			if err != nil {
-				backend := logging.AddModuleLevel(
-					logging.NewBackendFormatter(
-						logging.NewLogBackend(outputWriter, "", 0),
-						logging.MustStringFormatter(`%{color}%{time:15:04:05.000}\t%{shortfunc}\t%{level}%{color:reset}:\t%{message}`)))
-				var level logging.Level
-				if level, err = logging.LogLevel(config.Log.Level); err != nil {
-					println(err)
-					level = logging.INFO
-				}
-				backend.SetLevel(level, "")
-				logging.SetBackend(backend)
-			}
-		}
+		err = json.Unmarshal(confData, &config)
 	}
 	return &config, err
 }
 
 func (cr *Observer) Engage() {
-	database := &intl.Database{
-		Path: cr.DBFile,
-	}
+	database := &intl.Database{}
 	telegram := &intl.Telegram{
-		Token: cr.TelegramToken,
 		DB:    database,
 	}
-	err := database.CheckConnection()
+	err := database.Connect(cr.DBFile)
 	if err == nil {
-		err = telegram.Engage(-1)
+		defer database.Close()
+		err = telegram.Connect(cr.TelegramToken, cr.AdminOTPSeed, -1)
 		if err == nil {
 			baseOffset, err := database.GetCrawlOffset()
 			if err != nil {
-				logger.Error(err)
+				intl.Logger.Error(err)
 			}
+			var errCount uint
 			for {
 				var i, offset uint
 				offset = baseOffset
 				for i = 0; i < cr.Crawler.Threshold; i++ {
 					currentOffset := offset + i
+					intl.Logger.Debugf("Checking offset %d", currentOffset)
 					fullUrl := fmt.Sprintf(cr.Crawler.URL, currentOffset)
-					if resp, err := http.Get(fullUrl); err == nil && resp != nil {
-						if torrent, err := intl.ReadTorrent(resp.Body); err != nil {
+					if resp, err := http.Get(fullUrl); err == nil && resp != nil && resp.StatusCode < 400 {
+						errCount = 0
+						if torrent, err := intl.ReadTorrent(resp.Body); err == nil {
+							intl.Logger.Infof("New file: %s", torrent.Info.Name)
+							torrent.URL = fullUrl
 							newSize := torrent.FullSize()
+							intl.Logger.Infof("New torrent size %d", newSize)
 							if newSize > 0 {
 								action := cr.Messages.Added
 								announce := true
 								existSize, err := database.GetTorrentSize(torrent.Info.Name)
 								if err != nil {
-									logger.Error(err)
+									intl.Logger.Error(err)
 								}
+								intl.Logger.Debugf("Existing torrent size: %d", existSize)
 								if existSize > 0 {
 									size0, size1 := existSize, newSize
 									if size0 > size1 {
 										size1, size0 = size0, size1
 									}
-									if uint((size0*100)/size1) > cr.SizeThreshold {
+									perc := uint((size0*100)/size1)
+									if perc > cr.SizeThreshold {
 										action = cr.Messages.Updated
 									} else {
+										intl.Logger.Debugf("Size diff is less than threshold: %d (%d%% diff)", newSize, perc)
 										announce = false
 									}
 								}
 								if announce {
 									go cr.Announce(telegram, action, torrent)
 									if currentOffset%1000 == 0 {
-										go cr.N1000Get(telegram)
+										go cr.N1000Get(telegram, currentOffset)
 									}
 								}
 								if err := database.UpdateTorrent(torrent.Info.Name, newSize); err != nil {
-									logger.Error(err)
+									intl.Logger.Error(err)
 								}
 								baseOffset = currentOffset
 								if err := database.UpdateCrawlOffset(baseOffset); err != nil {
-									logger.Error(err)
+									intl.Logger.Error(err)
 								}
 							} else {
-								logger.Errorf("Zero torrent size, baseOffset: ", baseOffset)
+								intl.Logger.Errorf("Zero torrent size, baseOffset: ", baseOffset)
 							}
+						} else {
+							intl.Logger.Debugf("%s not a torrent: %v", fullUrl, err)
 						}
 					} else {
-						errMsg := "Empty response"
+						var errMsg string
+						errCount++
 						if err != nil {
 							errMsg = err.Error()
+						} else if resp == nil {
+							errMsg = "Empty response"
+						} else {
+							errMsg = resp.Status
 						}
-						logger.Warning(errMsg)
+						intl.Logger.Warningf("Crawling error: %s", errMsg)
+						if errCount%cr.Crawler.ErrorThreshold == 0 {
+							go cr.UnaiwailNotify(telegram, errCount, errMsg)
+						}
 					}
 				}
-				time.Sleep(time.Duration(rand.Intn(int(cr.Crawler.Delay))+int(cr.Crawler.Delay)) * time.Second)
+				sleepTime := time.Duration(rand.Intn(int(cr.Crawler.Delay))+int(cr.Crawler.Delay))
+				intl.Logger.Debugf("Sleeping %d sec", sleepTime)
+				time.Sleep(sleepTime * time.Second)
 			}
 		}
 	}
 	if err != nil {
-		logger.Fatal(err)
+		intl.Logger.Fatal(err)
 	}
 }
 
-func (cr *Observer) Announce(telegram *intl.Telegram, action string, torrent *intl.Torrent) {
-
+func (cr *Observer) Announce(tlg *intl.Telegram, action string, torrent *intl.Torrent) {
+	intl.Logger.Debugf("Announcing %s", torrent.Info.Name)
 }
 
-func (cr *Observer) N1000Get(telegram *intl.Telegram) {
+func (cr *Observer) N1000Get(tlg *intl.Telegram, offset uint) {
+	intl.Logger.Debugf("Notifying %d GET", offset)
+}
 
+func (cr *Observer) UnaiwailNotify(tlg *intl.Telegram, count uint, msg string) {
+	intl.Logger.Noticef("Notifying about error: try %d, message %s", count, msg)
 }

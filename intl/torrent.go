@@ -51,6 +51,7 @@ type Torrent struct {
 		PieceLength uint64 `bencode:"piece length"`
 		Pieces      []byte `bencode:"pieces"`
 	} `bencode:"info"`
+	URL string `bencode:"-"`
 }
 
 func ReadTorrent(stream io.Reader) (*Torrent, error) {
@@ -70,21 +71,26 @@ func (t *Torrent) FullSize() uint64 {
 			}
 		}
 	}
-	return fullLen * t.Info.PieceLength
+	return fullLen
 }
 
-func SizeToStr(size uint64) string{
+func SizeToStr(size uint64) string {
 	const base = 1024
+	const suff = "KMGTPEZY"
 	var res string
 	if size < base {
 		res = fmt.Sprintf("%d B", size)
 	} else {
-		d, e := int64(base), 0
+		d, e := uint64(base), 0
 		for n := size / base; n >= base; n /= base {
 			d *= base
 			e++
 		}
-		res = fmt.Sprintf("%.2f %ciB", float64(size)/float64(d), "KMGTPE"[e])
+		s := '?'
+		if e < len(suff){
+			s = rune(suff[e])
+		}
+		res = fmt.Sprintf("%.2f %ciB", float64(size)/float64(d), s)
 	}
 	return res
 }
