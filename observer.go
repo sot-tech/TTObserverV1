@@ -28,12 +28,28 @@ package TTObserver
 
 import (
 	"./intl"
+	"container/list"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"html"
 	"io/ioutil"
 	"math"
 	"math/rand"
+	"net/http"
+	"regexp"
+	"strings"
 	"time"
+)
+
+const (
+	actGo      = "go"
+	actExtract = "extract"
+	actCheck = "check"
+	actReturn  = "return"
+
+	paramTorrent = "${torrent}"
+	paramArg     = "${arg}"
 )
 
 type Observer struct {
@@ -42,16 +58,24 @@ type Observer struct {
 		Level string `json:"level"`
 	} `json:"log"`
 	Crawler struct {
-		URL            string `json:"url"`
-		Threshold      uint   `json:"threshold"`
-		ErrorThreshold uint   `json:"errorthreshold"`
-		Delay          uint   `json:"delay"`
+		URL struct {
+			Base               string `json:"base"`
+			Torrent            string `json:"torrent"`
+			ExtractNameActions []struct {
+				Action string `json:"action"`
+				Param  string `json:"param"`
+			} `json:"extractnameactions"`
+		} `json:"url"`
+		Threshold      uint `json:"threshold"`
+		ErrorThreshold uint `json:"errorthreshold"`
+		Delay          uint `json:"delay"`
 	} `json:"crawler"`
-	SizeThreshold float64       `json:"sizethreshold"`
-	TelegramToken string        `json:"telegramtoken"`
-	AdminOTPSeed  string        `json:"adminotpseed"`
-	DBFile        string        `json:"dbfile"`
-	Messages      intl.Messages `json:"msg"`
+	TryExtractName bool          `json:"tryextractname"`
+	SizeThreshold  float64       `json:"sizethreshold"`
+	TelegramToken  string        `json:"telegramtoken"`
+	AdminOTPSeed   string        `json:"adminotpseed"`
+	DBFile         string        `json:"dbfile"`
+	Messages       intl.Messages `json:"msg"`
 }
 
 func ReadConfig(path string) (*Observer, error) {
@@ -87,7 +111,8 @@ func (cr *Observer) Engage() {
 				for i = 0; i < cr.Crawler.Threshold; i++ {
 					currentOffset := offset + i
 					intl.Logger.Debugf("Checking offset %d", currentOffset)
-					fullUrl := fmt.Sprintf(cr.Crawler.URL, currentOffset)
+					torrentContext := fmt.Sprintf(cr.Crawler.URL.Torrent, currentOffset)
+					fullUrl := cr.Crawler.URL.Base + torrentContext
 					if torrent, err := intl.GetTorrent(fullUrl); err == nil {
 						wasError = false
 						errCount = 0
@@ -115,6 +140,11 @@ func (cr *Observer) Engage() {
 									}
 								}
 								if announce {
+									if cr.TryExtractName {
+										if newName := cr.ExtractName(torrentContext); newName != ""{
+											torrent.Info.Name = newName
+										}
+									}
 									if isNew {
 										go telegram.AnnounceNew(torrent)
 									} else {
@@ -146,7 +176,7 @@ func (cr *Observer) Engage() {
 						break
 					}
 				}
-				if wasError{
+				if wasError {
 					errCount++
 				}
 				sleepTime := time.Duration(rand.Intn(int(cr.Crawler.Delay)) + int(cr.Crawler.Delay))
@@ -158,4 +188,112 @@ func (cr *Observer) Engage() {
 	if err != nil {
 		intl.Logger.Fatal(err)
 	}
+}
+
+func (cr *Observer) ExtractName(context string) string {
+	var res string
+	funcs := list.New()
+	var f *list.Element
+	stop := false
+	for actIndex := len(cr.Crawler.URL.ExtractNameActions) - 1; actIndex >= 0; actIndex-- {
+		action := cr.Crawler.URL.ExtractNameActions[actIndex]
+		var currentFunc func(string)
+		switch action.Action {
+		case actGo:
+			currentFunc = func(param string) {
+				var nextFunc func(string)
+				if f != nil {
+					f = f.Next()
+					if f != nil {
+						nextFunc = f.Value.(func(string))
+					}
+				}
+				url := cr.Crawler.URL.Base + strings.Replace(action.Param, paramArg, param, -1)
+				url = strings.Replace(url, paramTorrent, context, -1)
+				if resp, err := http.Get(url); err == nil && resp != nil && resp.StatusCode < 400 {
+					if bytes, err := ioutil.ReadAll(resp.Body); err == nil {
+						if nextFunc != nil {
+							nextFunc(string(bytes))
+						}
+					} else {
+						intl.Logger.Warningf("Read body error: %v", err)
+					}
+				} else {
+					var errMsg string
+					if err != nil {
+						errMsg = err.Error()
+					} else if resp == nil {
+						errMsg = "empty response"
+					} else {
+						errMsg = resp.Status
+					}
+					err = errors.New(errMsg)
+					intl.Logger.Warningf("HTTP error: %s", errMsg)
+				}
+			}
+		case actExtract:
+			currentFunc = func(param string) {
+				var nextFunc func(string)
+				if f != nil {
+					f = f.Next()
+					if f != nil {
+						nextFunc = f.Value.(func(string))
+					}
+				}
+				pattern := strings.Replace(action.Param, paramArg, param, -1)
+				pattern = strings.Replace(pattern, paramTorrent, context, -1)
+				if reg, err := regexp.Compile("(?s)" + pattern); err == nil {
+					matches := reg.FindAllStringSubmatch(param, -1)
+					if matches != nil {
+						for _, match := range matches {
+							if match != nil && len(match) > 1 {
+								if nextFunc != nil {
+									tmpF := f
+									nextFunc(match[1])
+									f = tmpF
+								}
+							}
+							if stop {
+								break
+							}
+						}
+					}
+				} else {
+					intl.Logger.Warning(err)
+				}
+			}
+		case actCheck:
+			currentFunc = func(param string) {
+				var nextFunc func(string)
+				if f != nil {
+					f = f.Next()
+					if f != nil {
+						nextFunc = f.Value.(func(string))
+					}
+				}
+				pattern := strings.Replace(action.Param, paramArg, param, -1)
+				pattern = strings.Replace(pattern, paramTorrent, context, -1)
+				if reg, err := regexp.Compile("(?s)" + pattern); err == nil {
+					if matches := reg.FindStringSubmatch(param); matches != nil && len(matches) > 0 {
+						if nextFunc != nil{
+							nextFunc(param)
+						}
+					}
+				} else {
+					intl.Logger.Warning(err)
+				}
+			}
+		case actReturn:
+			currentFunc = func(param string) {
+				res = param
+				stop = true
+			}
+		}
+		funcs.PushFront(currentFunc)
+	}
+	if funcs.Len() > 0{
+		f = funcs.Front()
+		f.Value.(func(string))("")
+	}
+	return html.UnescapeString(res)
 }

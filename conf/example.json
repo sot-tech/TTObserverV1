@@ -4,11 +4,41 @@
 		"level": "DEBUG"
 	},
 	"crawler": {
-		"url": "http://site.local/uploads/%d",
+		"url": {
+			"base": "http://site.local",
+			"torrent": "/content/torrent/%d",
+			"extractnameactions": [
+				{
+					"action": "go",
+					"param": "/catalog"
+				},
+				{
+					"action": "extract",
+					"param": "<p class=\"catalog_element\">.*?<a .*?href=\"(.*?)\".*?>"
+				},
+				{
+					"action": "go",
+					"param": "${arg}"
+				},
+				{
+					"action": "check",
+					"param": "<div class=\"release_torrent\">.*?<a class=\"button button_black\" href=\"\\Q${torrent}\\E\">"
+				},
+				{
+					"action": "extract",
+					"param": "<div class=\"main_title\">.*?<span>(.*?)</span>"
+				},
+				{
+					"action": "return",
+					"param": ""
+				}
+			]
+		},
 		"threshold": 10,
 		"errorthreshold": 10,
-		"delay": 20
+		"delay": 10
 	},
+	"tryextractname": true,
 	"sizethreshold": 5.0,
 	"telegramtoken": "123456:1234567890abcdef",
 	"adminotpseed": "BASE32LONGLONGSEEDSTRING",
