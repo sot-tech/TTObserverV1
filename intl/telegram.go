@@ -27,8 +27,10 @@
 package intl
 
 import (
+	"fmt"
 	tlg "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/xlzd/gotp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -40,13 +42,12 @@ const (
 	msgAnnounceUrl    = "${url}"
 	msgGetIndex       = "${index}"
 	msgErrorMsg       = "${msg}"
-	msgErrorTry       = "${try}"
 
-	cmdStart    = "/start"
-	cmdAttach   = "/attach"
-	cmdDetach   = "/detach"
-	cmdSetAdmin = "/setadmin"
-	cmdRmAdmin  = "/rmadmin"
+	cmdStart    = "start"
+	cmdAttach   = "attach"
+	cmdDetach   = "detach"
+	cmdSetAdmin = "setadmin"
+	cmdRmAdmin  = "rmadmin"
 )
 
 type Messages struct {
@@ -58,6 +59,7 @@ type Messages struct {
 		SetAdmin     string `json:"setadmin"`
 		RmAdmin      string `json:"rmadmin"`
 		Unauthorized string `json:"auth"`
+		Unknown      string `json:"unknown"`
 	} `json:"cmds"`
 	Announce string `json:"announce"`
 	N1000    string `json:"n1000"`
@@ -73,12 +75,57 @@ type Telegram struct {
 	TOTP     *gotp.TOTP
 }
 
-func (tg *Telegram) processCommand(msg *tlg.Message) {
-	msg.Chat.ID
-	switch msg.Command(){
-	case cmdStart:
+func (tg *Telegram) checkOtp(args string) bool {
+	return tg.TOTP.Verify(args, int(time.Now().Unix()))
+}
 
+func (tg *Telegram) processCommand(msg *tlg.Message) {
+	chat := msg.Chat.ID
+	resp := tg.Messages.Commands.Unknown
+	cmd := msg.Command()
+	switch cmd {
+	case cmdStart:
+		resp = tg.Messages.Commands.Start
+	case cmdAttach:
+		if err := tg.DB.AddChat(chat); err == nil {
+			Logger.Noticef("New chat added %d", chat)
+			resp = tg.Messages.Commands.Attach
+		} else {
+			resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
+		}
+	case cmdDetach:
+		if err := tg.DB.DelChat(chat); err == nil {
+			Logger.Noticef("Chat deleted %d", chat)
+			resp = tg.Messages.Commands.Detach
+		} else {
+			resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
+		}
+	case cmdSetAdmin:
+		if tg.checkOtp(msg.CommandArguments()) {
+			if err := tg.DB.AddAdmin(chat); err == nil {
+				Logger.Noticef("New admin added %d", chat)
+				resp = tg.Messages.Commands.SetAdmin
+			} else {
+				resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
+			}
+		} else {
+			Logger.Noticef("SetAdmin unauthorized %d", chat)
+			resp = tg.Messages.Commands.Unauthorized
+		}
+	case cmdRmAdmin:
+		if tg.checkOtp(msg.CommandArguments()) {
+			if err := tg.DB.DelAdmin(chat); err == nil {
+				Logger.Noticef("Admin deleted %d", chat)
+				resp = tg.Messages.Commands.RmAdmin
+			} else {
+				resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
+			}
+		} else {
+			Logger.Noticef("RmAdmin unauthorized %d", chat)
+			resp = tg.Messages.Commands.Unauthorized
+		}
 	}
+	tg.sendMsg(resp, []int64{chat}, false)
 }
 
 func (tg *Telegram) HandleUpdates() {
@@ -94,7 +141,7 @@ func (tg *Telegram) HandleUpdates() {
 			var msg *tlg.Message
 			if up.Message != nil && up.Message.IsCommand() {
 				msg = up.Message
-			} else if up.ChannelPost != nil && up.Message.IsCommand() {
+			} else if up.ChannelPost != nil && up.ChannelPost.IsCommand() {
 				msg = up.ChannelPost
 			}
 			if msg != nil {
@@ -112,13 +159,15 @@ func (tg *Telegram) HandleUpdates() {
 	}
 }
 
-func (tg *Telegram) sendMsg(msg string, chats []int64) {
+func (tg *Telegram) sendMsg(msg string, chats []int64, formatted bool) {
 	if msg != "" && len(chats) > 0 {
 		var err error
 		Logger.Debugf("Sending message %s to %v", msg, chats)
 		for _, chat := range chats {
 			msg := tlg.NewMessage(chat, msg)
-			msg.ParseMode = "Markdown"
+			if formatted {
+				msg.ParseMode = "Markdown"
+			}
 			if _, err = tg.Bot.Send(msg); err == nil {
 				Logger.Debugf("Message to %d has been sent", chat)
 			} else {
@@ -134,7 +183,7 @@ func (tg *Telegram) SendMsgToAdmins(msg string) {
 	if chats, err = tg.DB.GetAdmins(); err != nil {
 		Logger.Error(err)
 	}
-	tg.sendMsg(msg, chats)
+	tg.sendMsg(msg, chats, false)
 }
 
 func (tg *Telegram) SendMsgToMobs(msg string) {
@@ -143,7 +192,7 @@ func (tg *Telegram) SendMsgToMobs(msg string) {
 	if chats, err = tg.DB.GetChats(); err != nil {
 		Logger.Error(err)
 	}
-	tg.sendMsg(msg, chats)
+	tg.sendMsg(msg, chats, true)
 }
 
 func (tg *Telegram) announce(action string, torrent *Torrent) {
@@ -158,16 +207,10 @@ func (tg *Telegram) announce(action string, torrent *Torrent) {
 				name = strings.Replace(name, k, v, -1)
 			}
 		}
-		msgReplacements := map[string]string{
-			msgAnnounceAction: action,
-			msgAnnounceName:   name,
-			msgAnnounceSize:   torrent.StringSize(),
-			msgAnnounceUrl:    torrent.URL,
-		}
-
-		for k, v := range msgReplacements {
-			msg = strings.Replace(msg, k, v, -1)
-		}
+		msg = strings.Replace(msg, msgAnnounceAction, action, -1)
+		msg = strings.Replace(msg, msgAnnounceName, name, -1)
+		msg = strings.Replace(msg, msgAnnounceSize, torrent.StringSize(), -1)
+		msg = strings.Replace(msg, msgAnnounceUrl, torrent.URL, -1)
 
 		tg.SendMsgToMobs(msg)
 	}
@@ -186,7 +229,7 @@ func (tg *Telegram) N1000Get(offset uint) {
 		Logger.Warning("N1000 message not set")
 	} else {
 		Logger.Debugf("Notifying %d GET", offset)
-		tg.SendMsgToMobs(strings.Replace(tg.Messages.N1000, msgGetIndex, string(offset), -1))
+		tg.SendMsgToMobs(strings.Replace(tg.Messages.N1000, msgGetIndex, strconv.FormatUint(uint64(offset), 10), -1))
 	}
 }
 
@@ -195,8 +238,7 @@ func (tg *Telegram) UnaiwailNotify(count uint, err string) {
 		Logger.Warning("Error message not set")
 	} else {
 		Logger.Noticef("Notifying about error: try %d, message %s", count, err)
-		msg := strings.Replace(tg.Messages.Error, msgErrorMsg, err, -1)
-		msg = strings.Replace(err, msgErrorTry, string(count), -1)
+		msg := strings.Replace(tg.Messages.Error, msgErrorMsg, fmt.Sprintf("%s (try %d)", err, count), -1)
 		tg.SendMsgToAdmins(msg)
 	}
 }

@@ -9,18 +9,18 @@
 		"errorthreshold": 10,
 		"delay": 20
 	},
-	"sizethreshold": 5,
+	"sizethreshold": 5.0,
 	"telegramtoken": "123456:1234567890abcdef",
 	"adminotpseed": "BASE32LONGLONGSEEDSTRING",
-	"dbfile": "tt.db",
+	"dbfile": "conf/example.db",
 	"msg": {
-		"announce": "*New torrent ${action}*\n`${name}:${size}`\n[Download](${url})\n",
+		"announce": "*Torrent ${action}*\n`${name}:${size}`\n[Download](${url})\n",
 		"n1000": "New GET ${index}",
-		"added": "Added",
-		"updated": "Updated",
-		"error": "Target error, try ${try}: ${msg}",
+		"added": "added",
+		"updated": "updated",
+		"error": "Operation error: ${msg}",
 		"replacements": {
-			"_": ""
+			"_": " "
 		},
 		"cmds": {
 			"start": "Available commands:\n/start - this help\n/attach - subscribe\n/detach - unsubscribe",
@@ -28,7 +28,8 @@
 			"detach": "Removed from announce list",
 			"setadmin": "You now admin",
 			"rmadmin": "You now not admin",
-			"auth": "Unauthorized"
+			"auth": "Unauthorized",
+			"unknown": "Unknown command"
 		}
 	}	
 }

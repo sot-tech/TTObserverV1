@@ -58,20 +58,20 @@ type Torrent struct {
 func GetTorrent(url string) (*Torrent, error){
 	var res *Torrent
 	var err error
-	if resp, err := http.Get(url); err == nil && resp != nil && resp.StatusCode < 400 {
+	if resp, httpErr := http.Get(url); httpErr == nil && resp != nil && resp.StatusCode < 400 {
 		var torrent Torrent
 		err := bencode.NewDecoder(resp.Body).Decode(&torrent)
 		if err == nil{
 			res = &torrent
 		}
 	} else{
-		var errMsg string
-		if err != nil {
-			errMsg = err.Error()
+		errMsg := "crawling: "
+		if httpErr != nil {
+			errMsg += httpErr.Error()
 		} else if resp == nil {
-			errMsg = "empty response"
+			errMsg += "empty response"
 		} else {
-			errMsg = resp.Status
+			errMsg += resp.Status
 		}
 		err = errors.New(errMsg)
 	}

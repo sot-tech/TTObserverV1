@@ -31,6 +31,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"math/rand"
 	"time"
 )
@@ -46,7 +47,7 @@ type Observer struct {
 		ErrorThreshold uint   `json:"errorthreshold"`
 		Delay          uint   `json:"delay"`
 	} `json:"crawler"`
-	SizeThreshold uint          `json:"sizethreshold"`
+	SizeThreshold float64       `json:"sizethreshold"`
 	TelegramToken string        `json:"telegramtoken"`
 	AdminOTPSeed  string        `json:"adminotpseed"`
 	DBFile        string        `json:"dbfile"`
@@ -66,7 +67,7 @@ func (cr *Observer) Engage() {
 	database := &intl.Database{}
 	telegram := &intl.Telegram{
 		Messages: cr.Messages,
-		DB: database,
+		DB:       database,
 	}
 	err := database.Connect(cr.DBFile)
 	if err == nil {
@@ -82,14 +83,16 @@ func (cr *Observer) Engage() {
 			for {
 				var i, offset uint
 				offset = baseOffset
+				wasError := false
 				for i = 0; i < cr.Crawler.Threshold; i++ {
 					currentOffset := offset + i
 					intl.Logger.Debugf("Checking offset %d", currentOffset)
 					fullUrl := fmt.Sprintf(cr.Crawler.URL, currentOffset)
 					if torrent, err := intl.GetTorrent(fullUrl); err == nil {
+						wasError = false
 						errCount = 0
 						if torrent != nil {
-							intl.Logger.Infof("New file: %s", torrent.Info.Name)
+							intl.Logger.Infof("New file %s", torrent.Info.Name)
 							torrent.URL = fullUrl
 							newSize := torrent.FullSize()
 							intl.Logger.Infof("New torrent size %d", newSize)
@@ -102,22 +105,19 @@ func (cr *Observer) Engage() {
 								}
 								intl.Logger.Debugf("Existing torrent size: %d", existSize)
 								if existSize > 0 {
-									size0, size1 := existSize, newSize
-									if size0 > size1 {
-										size1, size0 = size0, size1
-									}
-									diff := uint((size0 * 100) / size1)
+									size0, size1 := float64(existSize), float64(newSize)
+									diff := 100 - math.Abs(size0*100.0/size1)
 									if diff > cr.SizeThreshold {
 										isNew = false
 									} else {
-										intl.Logger.Debugf("Size diff is less than threshold: %d (%d%% diff)", newSize, diff)
+										intl.Logger.Infof("Size diff is less than threshold: %d (%.1f%% diff)", newSize, diff)
 										announce = false
 									}
 								}
 								if announce {
-									if isNew{
+									if isNew {
 										go telegram.AnnounceNew(torrent)
-									} else{
+									} else {
 										go telegram.AnnounceUpdate(torrent)
 									}
 									if currentOffset%1000 == 0 {
@@ -127,23 +127,27 @@ func (cr *Observer) Engage() {
 								if err := database.UpdateTorrent(torrent.Info.Name, newSize); err != nil {
 									intl.Logger.Error(err)
 								}
-								baseOffset = currentOffset
+								baseOffset = currentOffset + 1
 								if err := database.UpdateCrawlOffset(baseOffset); err != nil {
 									intl.Logger.Error(err)
 								}
 							} else {
-								intl.Logger.Errorf("Zero torrent size, baseOffset: ", baseOffset)
+								intl.Logger.Errorf("Zero torrent size, offset %d", currentOffset)
 							}
 						} else {
-							intl.Logger.Debugf("%s not a torrent", fullUrl)
+							intl.Logger.Noticef("%s not a torrent", fullUrl)
 						}
 					} else {
-						errCount++
-						intl.Logger.Warningf("Crawling error: %v", err)
-						if errCount%cr.Crawler.ErrorThreshold == 0 {
+						wasError = true
+						intl.Logger.Errorf("Crawling error: %v", err)
+						if errCount > 0 && errCount%cr.Crawler.ErrorThreshold == 0 {
 							go telegram.UnaiwailNotify(errCount, err.Error())
 						}
+						break
 					}
+				}
+				if wasError{
+					errCount++
 				}
 				sleepTime := time.Duration(rand.Intn(int(cr.Crawler.Delay)) + int(cr.Crawler.Delay))
 				intl.Logger.Debugf("Sleeping %d sec", sleepTime)
@@ -155,4 +159,3 @@ func (cr *Observer) Engage() {
 		intl.Logger.Fatal(err)
 	}
 }
-
