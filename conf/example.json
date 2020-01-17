@@ -23,11 +23,12 @@
 			"_": " "
 		},
 		"cmds": {
-			"start": "Available commands:\n/start - this help\n/attach - subscribe\n/detach - unsubscribe",
+			"start": "Available commands:\n/start - this help\n/attach - subscribe\n/detach - unsubscribe\n/state - state of chat",
 			"attach": "Added to announce list",
 			"detach": "Removed from announce list",
 			"setadmin": "You now admin",
 			"rmadmin": "You now not admin",
+			"state": "Watch: ${watch}\nAdmin: ${admin}\nNext index: ${index}",
 			"auth": "Unauthorized",
 			"unknown": "Unknown command"
 		}

@@ -34,55 +34,56 @@ import (
 )
 
 type Database struct {
-	Con  *sql.DB
+	Con *sql.DB
 }
 
-const(
-
+const (
 	DBDriver = "sqlite3"
 
 	selectChats = "SELECT ID FROM TT_CHAT"
 	insertChat  = "INSERT INTO TT_CHAT(ID) VALUES ($1)"
 	delChat     = "DELETE FROM TT_CHAT WHERE ID = $1"
+	existChat   = "SELECT 1 FROM TT_CHAT WHERE ID = $1"
 
 	selectAdmins = "SELECT ID FROM TT_ADMIN"
-	insertAdmin = "INSERT INTO TT_ADMIN(ID) VALUES ($1)"
-	delAdmin = "DELETE FROM TT_ADMIN WHERE ID = $1"
+	insertAdmin  = "INSERT INTO TT_ADMIN(ID) VALUES ($1)"
+	delAdmin     = "DELETE FROM TT_ADMIN WHERE ID = $1"
+	existAdmin   = "SELECT 1 FROM TT_ADMIN WHERE ID = $1"
 
-	selectTorrentSize = "SELECT FULL_SIZE FROM TT_TORRENT WHERE NAME = $1"
+	selectTorrentSize     = "SELECT FULL_SIZE FROM TT_TORRENT WHERE NAME = $1"
 	insertOrUpdateTorrent = "INSERT INTO TT_TORRENT(NAME, FULL_SIZE) VALUES ($1, $2) ON CONFLICT(NAME) DO UPDATE SET FULL_SIZE = EXCLUDED.FULL_SIZE"
 
-	selectConfig = "SELECT VALUE FROM TT_CONFIG WHERE NAME = $1"
+	selectConfig         = "SELECT VALUE FROM TT_CONFIG WHERE NAME = $1"
 	insertOrUpdateConfig = "INSERT INTO TT_CONFIG(NAME, VALUE) VALUES ($1, $2) ON CONFLICT(NAME) DO UPDATE SET VALUE = EXCLUDED.VALUE"
 
 	confCrawlOffset = "CRAWL_OFFSET"
-	confTgOffset = "TG_OFFSET"
+	confTgOffset    = "TG_OFFSET"
 )
 
-func (db * Database) checkConnection() error{
+func (db *Database) checkConnection() error {
 	var err error
-	if db.Con == nil{
+	if db.Con == nil {
 		err = errors.New("connection not initialized")
-	} else{
+	} else {
 		err = db.Con.Ping()
 	}
 	return err
 }
 
-func (db *Database) getIntArray(query string, args ... interface{}) ([]int64, error){
+func (db *Database) getIntArray(query string, args ...interface{}) ([]int64, error) {
 	var arr []int64
 	var err error
 	err = db.checkConnection()
-	if err == nil{
+	if err == nil {
 		var rows *sql.Rows
 		rows, err = db.Con.Query(query, args...)
-		if err == nil && rows != nil{
+		if err == nil && rows != nil {
 			defer rows.Close()
 			for rows.Next() {
 				var element int64
-				if err := rows.Scan(&element); err == nil{
+				if err := rows.Scan(&element); err == nil {
 					arr = append(arr, element)
-				} else{
+				} else {
 					Logger.Errorf("Unable to append row value: %v", err)
 				}
 			}
@@ -91,21 +92,45 @@ func (db *Database) getIntArray(query string, args ... interface{}) ([]int64, er
 	return arr, err
 }
 
+func (db *Database) getNotEmpty(query string, args ...interface{}) (bool, error){
+	val := false
+	var err error
+	err = db.checkConnection()
+	if err == nil {
+		var rows *sql.Rows
+		rows, err = db.Con.Query(query, args...)
+		if err == nil && rows != nil {
+			defer rows.Close()
+			val = rows.Next()
+		}
+	}
+	return val, err
+}
+
 func (db *Database) GetChats() ([]int64, error) {
 	return db.getIntArray(selectChats)
 }
 
-func (db *Database) execNoResult(query string, args ... interface{}) error {
+func (db *Database) GetChatExist(chat int64) (bool, error) {
+	return db.getNotEmpty(existChat, chat)
+}
+
+func (db *Database) execNoResult(query string, args ...interface{}) error {
 	var err error
 	err = db.checkConnection()
-	if err == nil{
+	if err == nil {
 		_, err = db.Con.Exec(query, args...)
 	}
 	return err
 }
 
 func (db *Database) AddChat(chat int64) error {
-	return db.execNoResult(insertChat, chat)
+	var exist bool
+	var err error
+	if exist, err = db.GetChatExist(chat); err == nil && !exist {
+		err = db.execNoResult(insertChat, chat)
+	}
+	return err
 }
 
 func (db *Database) DelChat(chat int64) error {
@@ -116,8 +141,17 @@ func (db *Database) GetAdmins() ([]int64, error) {
 	return db.getIntArray(selectAdmins)
 }
 
+func (db *Database) GetAdminExist(chat int64) (bool, error) {
+	return db.getNotEmpty(existAdmin, chat)
+}
+
 func (db *Database) AddAdmin(id int64) error {
-	return db.execNoResult(insertAdmin, id)
+	var exist bool
+	var err error
+	if exist, err = db.GetAdminExist(id); err == nil && !exist {
+		err = db.execNoResult(insertAdmin, id)
+	}
+	return err
 }
 
 func (db *Database) DelAdmin(id int64) error {
@@ -128,10 +162,10 @@ func (db *Database) GetTorrentSize(torrent string) (uint64, error) {
 	var val uint64
 	var err error
 	err = db.checkConnection()
-	if err == nil{
+	if err == nil {
 		var rows *sql.Rows
 		rows, err = db.Con.Query(selectTorrentSize, torrent)
-		if err == nil && rows != nil{
+		if err == nil && rows != nil {
 			defer rows.Close()
 			if rows.Next() {
 				err = rows.Scan(&val)
@@ -145,14 +179,14 @@ func (db *Database) UpdateTorrent(name string, size uint64) error {
 	return db.execNoResult(insertOrUpdateTorrent, name, size)
 }
 
-func (db *Database) getConfigValue(name string) (string, error){
+func (db *Database) getConfigValue(name string) (string, error) {
 	var val string
 	var err error
 	err = db.checkConnection()
-	if err == nil{
+	if err == nil {
 		var rows *sql.Rows
 		rows, err = db.Con.Query(selectConfig, name)
-		if err == nil && rows != nil{
+		if err == nil && rows != nil {
 			defer rows.Close()
 			if rows.Next() {
 				err = rows.Scan(&val)
@@ -162,7 +196,7 @@ func (db *Database) getConfigValue(name string) (string, error){
 	return val, err
 }
 
-func (db *Database) updateConfigValue(name, val string) error{
+func (db *Database) updateConfigValue(name, val string) error {
 	return db.execNoResult(insertOrUpdateConfig, name, val)
 }
 
@@ -197,14 +231,14 @@ func (db *Database) UpdateTgOffset(offset int) error {
 func (db *Database) Connect(path string) error {
 	var err error
 	db.Con, err = sql.Open(DBDriver, path)
-	if err == nil{
+	if err == nil {
 		err = db.checkConnection()
 	}
 	return err
 }
 
-func (db *Database) Close(){
-	if db.Con != nil{
+func (db *Database) Close() {
+	if db.Con != nil {
 		_ = db.Con.Close()
 	}
 }

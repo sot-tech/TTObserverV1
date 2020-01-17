@@ -36,16 +36,19 @@ import (
 )
 
 const (
-	msgAnnounceAction = "${action}"
-	msgAnnounceName   = "${name}"
-	msgAnnounceSize   = "${size}"
-	msgAnnounceUrl    = "${url}"
-	msgGetIndex       = "${index}"
-	msgErrorMsg       = "${msg}"
+	msgAction   = "${action}"
+	msgName     = "${name}"
+	msgSize     = "${size}"
+	msgUrl      = "${url}"
+	msgIndex    = "${index}"
+	msgErrorMsg = "${msg}"
+	msgWatch    = "${watch}"
+	msgAdmin    = "${admin}"
 
 	cmdStart    = "start"
 	cmdAttach   = "attach"
 	cmdDetach   = "detach"
+	cmdState    = "state"
 	cmdSetAdmin = "setadmin"
 	cmdRmAdmin  = "rmadmin"
 )
@@ -56,6 +59,7 @@ type Messages struct {
 		Start        string `json:"start"`
 		Attach       string `json:"attach"`
 		Detach       string `json:"detach"`
+		State        string `json:"state"`
 		SetAdmin     string `json:"setadmin"`
 		RmAdmin      string `json:"rmadmin"`
 		Unauthorized string `json:"auth"`
@@ -100,6 +104,21 @@ func (tg *Telegram) processCommand(msg *tlg.Message) {
 			resp = tg.Messages.Commands.Detach
 		} else {
 			Logger.Warningf("Attach: %v", err)
+			resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
+		}
+	case cmdState:
+		var err error
+		var watch, admin bool
+		var offset uint
+		watch, err = tg.DB.GetChatExist(chat)
+		admin, err = tg.DB.GetAdminExist(chat)
+		offset, err = tg.DB.GetCrawlOffset()
+		if err == nil{
+			resp = strings.Replace(tg.Messages.Commands.State, msgWatch, strconv.FormatBool(watch), -1)
+			resp = strings.Replace(resp, msgAdmin, strconv.FormatBool(admin), -1)
+			resp = strings.Replace(resp, msgIndex, strconv.FormatUint(uint64(offset), 10), -1)
+		} else{
+			Logger.Warningf("State: %v", err)
 			resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
 		}
 	case cmdSetAdmin:
@@ -211,10 +230,10 @@ func (tg *Telegram) announce(action string, torrent *Torrent) {
 				name = strings.Replace(name, k, v, -1)
 			}
 		}
-		msg = strings.Replace(msg, msgAnnounceAction, action, -1)
-		msg = strings.Replace(msg, msgAnnounceName, name, -1)
-		msg = strings.Replace(msg, msgAnnounceSize, torrent.StringSize(), -1)
-		msg = strings.Replace(msg, msgAnnounceUrl, torrent.URL, -1)
+		msg = strings.Replace(msg, msgAction, action, -1)
+		msg = strings.Replace(msg, msgName, name, -1)
+		msg = strings.Replace(msg, msgSize, torrent.StringSize(), -1)
+		msg = strings.Replace(msg, msgUrl, torrent.URL, -1)
 
 		tg.SendMsgToMobs(msg)
 	}
@@ -233,7 +252,7 @@ func (tg *Telegram) N1000Get(offset uint) {
 		Logger.Warning("N1000 message not set")
 	} else {
 		Logger.Debugf("Notifying %d GET", offset)
-		tg.SendMsgToMobs(strings.Replace(tg.Messages.N1000, msgGetIndex, strconv.FormatUint(uint64(offset), 10), -1))
+		tg.SendMsgToMobs(strings.Replace(tg.Messages.N1000, msgIndex, strconv.FormatUint(uint64(offset), 10), -1))
 	}
 }
 
