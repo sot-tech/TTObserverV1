@@ -91,6 +91,7 @@ func (tg *Telegram) processCommand(msg *tlg.Message) {
 			Logger.Noticef("New chat added %d", chat)
 			resp = tg.Messages.Commands.Attach
 		} else {
+			Logger.Warningf("Attach: %v", err)
 			resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
 		}
 	case cmdDetach:
@@ -98,6 +99,7 @@ func (tg *Telegram) processCommand(msg *tlg.Message) {
 			Logger.Noticef("Chat deleted %d", chat)
 			resp = tg.Messages.Commands.Detach
 		} else {
+			Logger.Warningf("Attach: %v", err)
 			resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
 		}
 	case cmdSetAdmin:
@@ -106,10 +108,11 @@ func (tg *Telegram) processCommand(msg *tlg.Message) {
 				Logger.Noticef("New admin added %d", chat)
 				resp = tg.Messages.Commands.SetAdmin
 			} else {
+				Logger.Warningf("SetAdmin: %v", err)
 				resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
 			}
 		} else {
-			Logger.Noticef("SetAdmin unauthorized %d", chat)
+			Logger.Infof("SetAdmin unauthorized %d", chat)
 			resp = tg.Messages.Commands.Unauthorized
 		}
 	case cmdRmAdmin:
@@ -118,10 +121,11 @@ func (tg *Telegram) processCommand(msg *tlg.Message) {
 				Logger.Noticef("Admin deleted %d", chat)
 				resp = tg.Messages.Commands.RmAdmin
 			} else {
+				Logger.Warningf("RmAdmin: %v", err)
 				resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
 			}
 		} else {
-			Logger.Noticef("RmAdmin unauthorized %d", chat)
+			Logger.Infof("RmAdmin unauthorized %d", chat)
 			resp = tg.Messages.Commands.Unauthorized
 		}
 	}
