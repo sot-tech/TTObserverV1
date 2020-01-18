@@ -45,7 +45,7 @@ import (
 const (
 	actGo      = "go"
 	actExtract = "extract"
-	actCheck = "check"
+	actCheck   = "check"
 	actReturn  = "return"
 
 	paramTorrent = "${torrent}"
@@ -70,12 +70,12 @@ type Observer struct {
 		ErrorThreshold uint `json:"errorthreshold"`
 		Delay          uint `json:"delay"`
 	} `json:"crawler"`
-	TryExtractName bool          `json:"tryextractname"`
-	SizeThreshold  float64       `json:"sizethreshold"`
-	TelegramToken  string        `json:"telegramtoken"`
-	AdminOTPSeed   string        `json:"adminotpseed"`
-	DBFile         string        `json:"dbfile"`
-	Messages       intl.Messages `json:"msg"`
+	TryExtractPrettyName bool          `json:"tryextractprettyname"`
+	SizeThreshold        float64       `json:"sizethreshold"`
+	TelegramToken        string        `json:"telegramtoken"`
+	AdminOTPSeed         string        `json:"adminotpseed"`
+	DBFile               string        `json:"dbfile"`
+	Messages             intl.Messages `json:"msg"`
 }
 
 func ReadConfig(path string) (*Observer, error) {
@@ -140,9 +140,10 @@ func (cr *Observer) Engage() {
 									}
 								}
 								if announce {
-									if cr.TryExtractName {
-										if newName := cr.ExtractName(torrentContext); newName != ""{
-											torrent.Info.Name = newName
+									if cr.TryExtractPrettyName {
+										if prettyName, nameUrl := cr.ExtractPrettyName(torrentContext); prettyName != "" {
+											torrent.Info.Name = fmt.Sprintf("%s (%s)", prettyName, torrent.Info.Name)
+											torrent.PublisherUrl = nameUrl
 										}
 									}
 									if isNew {
@@ -190,8 +191,8 @@ func (cr *Observer) Engage() {
 	}
 }
 
-func (cr *Observer) ExtractName(context string) string {
-	var res string
+func (cr *Observer) ExtractPrettyName(context string) (string, string) {
+	var res, lastUrl string
 	funcs := list.New()
 	var f *list.Element
 	stop := false
@@ -208,9 +209,13 @@ func (cr *Observer) ExtractName(context string) string {
 						nextFunc = f.Value.(func(string))
 					}
 				}
-				url := cr.Crawler.URL.Base + strings.Replace(action.Param, paramArg, param, -1)
+				url := strings.Replace(action.Param, paramArg, param, -1)
 				url = strings.Replace(url, paramTorrent, context, -1)
+				if strings.Index(param, cr.Crawler.URL.Base) < 0 {
+					url = cr.Crawler.URL.Base + url
+				}
 				if resp, err := http.Get(url); err == nil && resp != nil && resp.StatusCode < 400 {
+					lastUrl = url
 					if bytes, err := ioutil.ReadAll(resp.Body); err == nil {
 						if nextFunc != nil {
 							nextFunc(string(bytes))
@@ -275,7 +280,7 @@ func (cr *Observer) ExtractName(context string) string {
 				pattern = strings.Replace(pattern, paramTorrent, context, -1)
 				if reg, err := regexp.Compile("(?s)" + pattern); err == nil {
 					if matches := reg.FindStringSubmatch(param); matches != nil && len(matches) > 0 {
-						if nextFunc != nil{
+						if nextFunc != nil {
 							nextFunc(param)
 						}
 					}
@@ -291,9 +296,9 @@ func (cr *Observer) ExtractName(context string) string {
 		}
 		funcs.PushFront(currentFunc)
 	}
-	if funcs.Len() > 0{
+	if funcs.Len() > 0 {
 		f = funcs.Front()
 		f.Value.(func(string))("")
 	}
-	return html.UnescapeString(res)
+	return html.UnescapeString(res), lastUrl
 }

@@ -36,14 +36,16 @@ import (
 )
 
 const (
-	msgAction   = "${action}"
-	msgName     = "${name}"
-	msgSize     = "${size}"
-	msgUrl      = "${url}"
-	msgIndex    = "${index}"
-	msgErrorMsg = "${msg}"
-	msgWatch    = "${watch}"
-	msgAdmin    = "${admin}"
+	msgAction       = "${action}"
+	msgName         = "${name}"
+	msgSize         = "${size}"
+	msgUrl          = "${url}"
+	msgIndex        = "${index}"
+	msgErrorMsg     = "${msg}"
+	msgWatch        = "${watch}"
+	msgAdmin        = "${admin}"
+	msgFileCount    = "${filecount}"
+	msgPublisherUrl = "${publisherurl}"
 
 	cmdStart    = "start"
 	cmdAttach   = "attach"
@@ -113,11 +115,11 @@ func (tg *Telegram) processCommand(msg *tlg.Message) {
 		watch, err = tg.DB.GetChatExist(chat)
 		admin, err = tg.DB.GetAdminExist(chat)
 		offset, err = tg.DB.GetCrawlOffset()
-		if err == nil{
+		if err == nil {
 			resp = strings.Replace(tg.Messages.Commands.State, msgWatch, strconv.FormatBool(watch), -1)
 			resp = strings.Replace(resp, msgAdmin, strconv.FormatBool(admin), -1)
 			resp = strings.Replace(resp, msgIndex, strconv.FormatUint(uint64(offset), 10), -1)
-		} else{
+		} else {
 			Logger.Warningf("State: %v", err)
 			resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
 		}
@@ -190,6 +192,7 @@ func (tg *Telegram) sendMsg(msg string, chats []int64, formatted bool) {
 			msg := tlg.NewMessage(chat, msg)
 			if formatted {
 				msg.ParseMode = "Markdown"
+				msg.DisableWebPagePreview = false
 			}
 			if _, err = tg.Bot.Send(msg); err == nil {
 				Logger.Debugf("Message to %d has been sent", chat)
@@ -234,7 +237,8 @@ func (tg *Telegram) announce(action string, torrent *Torrent) {
 		msg = strings.Replace(msg, msgName, name, -1)
 		msg = strings.Replace(msg, msgSize, torrent.StringSize(), -1)
 		msg = strings.Replace(msg, msgUrl, torrent.URL, -1)
-
+		msg = strings.Replace(msg, msgFileCount, strconv.FormatUint(torrent.FileCount(), 10), -1)
+		msg = strings.Replace(msg, msgPublisherUrl, torrent.PublisherUrl, -1)
 		tg.SendMsgToMobs(msg)
 	}
 }

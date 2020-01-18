@@ -92,6 +92,18 @@ func (t *Torrent) FullSize() uint64 {
 	return fullLen
 }
 
+func (t *Torrent) FileCount() uint64 {
+	var count uint64
+	if t.Info.Files == nil || len(t.Info.Files) == 0 {
+		if t.Info.Length > 0 {
+			count = 1
+		}
+	} else {
+		count = uint64(len(t.Info.Files))
+	}
+	return count
+}
+
 func (t *Torrent) StringSize() string{
 	const base = 1024
 	const suff = "KMGTPEZY"
