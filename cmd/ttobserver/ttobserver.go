@@ -57,7 +57,7 @@ func main() {
 		backend := logging.AddModuleLevel(
 			logging.NewBackendFormatter(
 				logging.NewLogBackend(outputWriter, "", 0),
-				logging.MustStringFormatter("%{time:15:04:05.000}\t%{shortfile}\t%{shortfunc}\t%{level}:\t%{message}")))
+				logging.MustStringFormatter("%{time:2006-01-02 15:04:05.000}\t%{shortfile}\t%{shortfunc}\t%{level}:\t%{message}")))
 		var level logging.Level
 		if level, err = logging.LogLevel(crawler.Log.Level); err != nil {
 			println(err)

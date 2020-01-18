@@ -52,6 +52,11 @@ const (
 	paramArg     = "${arg}"
 )
 
+type ExtractAction struct {
+	Action string `json:"action"`
+	Param  string `json:"param"`
+}
+
 type Observer struct {
 	Log struct {
 		File  string `json:"file"`
@@ -59,18 +64,17 @@ type Observer struct {
 	} `json:"log"`
 	Crawler struct {
 		URL struct {
-			Base               string `json:"base"`
-			Torrent            string `json:"torrent"`
-			ExtractNameActions []struct {
-				Action string `json:"action"`
-				Param  string `json:"param"`
-			} `json:"extractnameactions"`
+			Base                string          `json:"base"`
+			Torrent             string          `json:"torrent"`
+			ExtractNameActions  []ExtractAction `json:"extractnameactions"`
+			ExtractImageActions []ExtractAction `json:"extractimageactions"`
 		} `json:"url"`
 		Threshold      uint `json:"threshold"`
 		ErrorThreshold uint `json:"errorthreshold"`
 		Delay          uint `json:"delay"`
 	} `json:"crawler"`
 	TryExtractPrettyName bool          `json:"tryextractprettyname"`
+	TryExtractImage      bool          `json:"tryextractimage"`
 	SizeThreshold        float64       `json:"sizethreshold"`
 	TelegramToken        string        `json:"telegramtoken"`
 	AdminOTPSeed         string        `json:"adminotpseed"`
@@ -141,9 +145,19 @@ func (cr *Observer) Engage() {
 								}
 								if announce {
 									if cr.TryExtractPrettyName {
-										if prettyName, nameUrl := cr.ExtractPrettyName(torrentContext); prettyName != "" {
-											torrent.Info.Name = fmt.Sprintf("%s (%s)", prettyName, torrent.Info.Name)
-											torrent.PublisherUrl = nameUrl
+										if prettyNameBytes, nameUrl := cr.ExtractData(torrentContext, cr.Crawler.URL.ExtractNameActions);
+											prettyNameBytes != nil {
+											prettyName := string(prettyNameBytes)
+											if prettyName != "" {
+												torrent.Info.Name = fmt.Sprintf("%s (%s)", html.UnescapeString(prettyName), torrent.Info.Name)
+												torrent.PublisherUrl = nameUrl
+											}
+										}
+									}
+									if cr.TryExtractImage {
+										if imageBytes, _ := cr.ExtractData(torrentContext, cr.Crawler.URL.ExtractImageActions);
+											imageBytes != nil {
+											torrent.Poster = imageBytes
 										}
 									}
 									if isNew {
@@ -166,7 +180,7 @@ func (cr *Observer) Engage() {
 								intl.Logger.Errorf("Zero torrent size, offset %d", currentOffset)
 							}
 						} else {
-							intl.Logger.Noticef("%s not a torrent", fullUrl)
+							intl.Logger.Debugf("%s not a torrent", fullUrl)
 						}
 					} else {
 						wasError = true
@@ -191,22 +205,27 @@ func (cr *Observer) Engage() {
 	}
 }
 
-func (cr *Observer) ExtractPrettyName(context string) (string, string) {
-	var res, lastUrl string
+func (cr *Observer) ExtractData(context string, actions []ExtractAction) ([]byte, string) {
+	var lastUrl string
+	var res []byte
 	funcs := list.New()
 	var f *list.Element
 	stop := false
-	for actIndex := len(cr.Crawler.URL.ExtractNameActions) - 1; actIndex >= 0; actIndex-- {
-		action := cr.Crawler.URL.ExtractNameActions[actIndex]
-		var currentFunc func(string)
+	for actIndex := len(actions) - 1; actIndex >= 0; actIndex-- {
+		action := actions[actIndex]
+		var currentFunc func([]byte)
 		switch action.Action {
 		case actGo:
-			currentFunc = func(param string) {
-				var nextFunc func(string)
+			currentFunc = func(paramBytes []byte) {
+				var nextFunc func([]byte)
+				var param string
+				if paramBytes != nil {
+					param = string(paramBytes)
+				}
 				if f != nil {
 					f = f.Next()
 					if f != nil {
-						nextFunc = f.Value.(func(string))
+						nextFunc = f.Value.(func([]byte))
 					}
 				}
 				url := strings.Replace(action.Param, paramArg, param, -1)
@@ -218,7 +237,7 @@ func (cr *Observer) ExtractPrettyName(context string) (string, string) {
 					lastUrl = url
 					if bytes, err := ioutil.ReadAll(resp.Body); err == nil {
 						if nextFunc != nil {
-							nextFunc(string(bytes))
+							nextFunc(bytes)
 						}
 					} else {
 						intl.Logger.Warningf("Read body error: %v", err)
@@ -237,18 +256,20 @@ func (cr *Observer) ExtractPrettyName(context string) (string, string) {
 				}
 			}
 		case actExtract:
-			currentFunc = func(param string) {
-				var nextFunc func(string)
+			currentFunc = func(param []byte) {
+				var nextFunc func([]byte)
 				if f != nil {
 					f = f.Next()
 					if f != nil {
-						nextFunc = f.Value.(func(string))
+						nextFunc = f.Value.(func([]byte))
 					}
 				}
-				pattern := strings.Replace(action.Param, paramArg, param, -1)
-				pattern = strings.Replace(pattern, paramTorrent, context, -1)
+				if param == nil {
+					param = make([]byte, 0)
+				}
+				pattern := strings.Replace(action.Param, paramTorrent, context, -1)
 				if reg, err := regexp.Compile("(?s)" + pattern); err == nil {
-					matches := reg.FindAllStringSubmatch(param, -1)
+					matches := reg.FindAllSubmatch(param, -1)
 					if matches != nil {
 						for _, match := range matches {
 							if match != nil && len(match) > 1 {
@@ -268,28 +289,36 @@ func (cr *Observer) ExtractPrettyName(context string) (string, string) {
 				}
 			}
 		case actCheck:
-			currentFunc = func(param string) {
-				var nextFunc func(string)
+			currentFunc = func(param []byte) {
+				var nextFunc func([]byte)
 				if f != nil {
 					f = f.Next()
 					if f != nil {
-						nextFunc = f.Value.(func(string))
+						nextFunc = f.Value.(func([]byte))
 					}
 				}
-				pattern := strings.Replace(action.Param, paramArg, param, -1)
-				pattern = strings.Replace(pattern, paramTorrent, context, -1)
-				if reg, err := regexp.Compile("(?s)" + pattern); err == nil {
-					if matches := reg.FindStringSubmatch(param); matches != nil && len(matches) > 0 {
-						if nextFunc != nil {
-							nextFunc(param)
-						}
+				if param == nil {
+					param = make([]byte, 0)
+				}
+				if action.Param == "" {
+					if len(param) > 0 && nextFunc != nil {
+						nextFunc(param)
 					}
 				} else {
-					intl.Logger.Warning(err)
+					pattern := strings.Replace(action.Param, paramTorrent, context, -1)
+					if reg, err := regexp.Compile("(?s)" + pattern); err == nil {
+						if matches := reg.FindSubmatch(param); matches != nil && len(matches) > 0 {
+							if nextFunc != nil {
+								nextFunc(param)
+							}
+						}
+					} else {
+						intl.Logger.Warning(err)
+					}
 				}
 			}
 		case actReturn:
-			currentFunc = func(param string) {
+			currentFunc = func(param []byte) {
 				res = param
 				stop = true
 			}
@@ -298,7 +327,7 @@ func (cr *Observer) ExtractPrettyName(context string) (string, string) {
 	}
 	if funcs.Len() > 0 {
 		f = funcs.Front()
-		f.Value.(func(string))("")
+		f.Value.(func([]byte))(nil)
 	}
-	return html.UnescapeString(res), lastUrl
+	return res, lastUrl
 }

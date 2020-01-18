@@ -52,19 +52,20 @@ type Torrent struct {
 		PieceLength uint64 `bencode:"piece length"`
 		Pieces      []byte `bencode:"pieces"`
 	} `bencode:"info"`
-	URL string `bencode:"-"`
+	URL    string `bencode:"-"`
+	Poster []byte `bencode:"-"`
 }
 
-func GetTorrent(url string) (*Torrent, error){
+func GetTorrent(url string) (*Torrent, error) {
 	var res *Torrent
 	var err error
 	if resp, httpErr := http.Get(url); httpErr == nil && resp != nil && resp.StatusCode < 400 {
 		var torrent Torrent
 		err := bencode.NewDecoder(resp.Body).Decode(&torrent)
-		if err == nil{
+		if err == nil {
 			res = &torrent
 		}
-	} else{
+	} else {
 		errMsg := "crawling: "
 		if httpErr != nil {
 			errMsg += httpErr.Error()
@@ -104,7 +105,7 @@ func (t *Torrent) FileCount() uint64 {
 	return count
 }
 
-func (t *Torrent) StringSize() string{
+func (t *Torrent) StringSize() string {
 	const base = 1024
 	const suff = "KMGTPEZY"
 	var size uint64
@@ -119,7 +120,7 @@ func (t *Torrent) StringSize() string{
 			e++
 		}
 		s := '?'
-		if e < len(suff){
+		if e < len(suff) {
 			s = rune(suff[e])
 		}
 		res = fmt.Sprintf("%.2f %ciB", float64(size)/float64(d), s)

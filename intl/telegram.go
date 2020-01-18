@@ -150,7 +150,7 @@ func (tg *Telegram) processCommand(msg *tlg.Message) {
 			resp = tg.Messages.Commands.Unauthorized
 		}
 	}
-	tg.sendMsg(resp, []int64{chat}, false)
+	tg.sendMsg(resp, nil, []int64{chat}, false)
 }
 
 func (tg *Telegram) HandleUpdates() {
@@ -184,18 +184,36 @@ func (tg *Telegram) HandleUpdates() {
 	}
 }
 
-func (tg *Telegram) sendMsg(msg string, chats []int64, formatted bool) {
-	if msg != "" && len(chats) > 0 {
-		var err error
-		Logger.Debugf("Sending message %s to %v", msg, chats)
+func (tg *Telegram) sendMsg(msgText string, msgPhoto []byte, chats []int64, formatted bool) {
+	if msgText != "" && chats != nil && len(chats) > 0 {
+		Logger.Debugf("Sending message %s to %v", msgText, chats)
+		var photoId string
 		for _, chat := range chats {
-			msg := tlg.NewMessage(chat, msg)
-			if formatted {
-				msg.ParseMode = "Markdown"
-				msg.DisableWebPagePreview = false
+			var msg tlg.Chattable
+			if msgPhoto != nil {
+				var photoMsg tlg.PhotoConfig
+				if photoId == "" {
+					photoMsg = tlg.NewPhotoUpload(chat, tlg.FileBytes{Bytes: msgPhoto})
+				} else{
+					photoMsg = tlg.NewPhotoShare(chat, photoId)
+				}
+				photoMsg.Caption = msgText
+				if formatted {
+					photoMsg.ParseMode = "Markdown"
+				}
+				msg = photoMsg
+			} else{
+				msgText := tlg.NewMessage(chat, msgText)
+				if formatted {
+					msgText.ParseMode = "Markdown"
+				}
+				msg = msgText
 			}
-			if _, err = tg.Bot.Send(msg); err == nil {
+			if sentMsg, err := tg.Bot.Send(msg); err == nil {
 				Logger.Debugf("Message to %d has been sent", chat)
+				if photoId == "" && sentMsg.Photo != nil && len(*sentMsg.Photo) > 0{
+					photoId = (*sentMsg.Photo)[0].FileID
+				}
 			} else {
 				Logger.Error(err)
 			}
@@ -203,22 +221,22 @@ func (tg *Telegram) sendMsg(msg string, chats []int64, formatted bool) {
 	}
 }
 
-func (tg *Telegram) SendMsgToAdmins(msg string) {
+func (tg *Telegram) SendMsgToAdmins(msg string, photo []byte) {
 	var chats []int64
 	var err error
 	if chats, err = tg.DB.GetAdmins(); err != nil {
 		Logger.Error(err)
 	}
-	tg.sendMsg(msg, chats, false)
+	tg.sendMsg(msg, photo, chats, false)
 }
 
-func (tg *Telegram) SendMsgToMobs(msg string) {
+func (tg *Telegram) SendMsgToMobs(msg string, photo []byte) {
 	var chats []int64
 	var err error
 	if chats, err = tg.DB.GetChats(); err != nil {
 		Logger.Error(err)
 	}
-	tg.sendMsg(msg, chats, true)
+	tg.sendMsg(msg, photo, chats, true)
 }
 
 func (tg *Telegram) announce(action string, torrent *Torrent) {
@@ -239,7 +257,7 @@ func (tg *Telegram) announce(action string, torrent *Torrent) {
 		msg = strings.Replace(msg, msgUrl, torrent.URL, -1)
 		msg = strings.Replace(msg, msgFileCount, strconv.FormatUint(torrent.FileCount(), 10), -1)
 		msg = strings.Replace(msg, msgPublisherUrl, torrent.PublisherUrl, -1)
-		tg.SendMsgToMobs(msg)
+		tg.SendMsgToMobs(msg, torrent.Poster)
 	}
 }
 
@@ -256,7 +274,7 @@ func (tg *Telegram) N1000Get(offset uint) {
 		Logger.Warning("N1000 message not set")
 	} else {
 		Logger.Debugf("Notifying %d GET", offset)
-		tg.SendMsgToMobs(strings.Replace(tg.Messages.N1000, msgIndex, strconv.FormatUint(uint64(offset), 10), -1))
+		tg.SendMsgToMobs(strings.Replace(tg.Messages.N1000, msgIndex, strconv.FormatUint(uint64(offset), 10), -1), nil)
 	}
 }
 
@@ -266,7 +284,7 @@ func (tg *Telegram) UnaiwailNotify(count uint, err string) {
 	} else {
 		Logger.Noticef("Notifying about error: try %d, message %s", count, err)
 		msg := strings.Replace(tg.Messages.Error, msgErrorMsg, fmt.Sprintf("%s (try %d)", err, count), -1)
-		tg.SendMsgToAdmins(msg)
+		tg.SendMsgToAdmins(msg, nil)
 	}
 }
 
