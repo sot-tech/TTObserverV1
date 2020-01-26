@@ -52,8 +52,9 @@ type Torrent struct {
 		PieceLength uint64 `bencode:"piece length"`
 		Pieces      []byte `bencode:"pieces"`
 	} `bencode:"info"`
-	URL    string `bencode:"-"`
-	Poster []byte `bencode:"-"`
+	URL        string `bencode:"-"`
+	Poster     []byte `bencode:"-"`
+	PrettyName string `bencode:"-"`
 }
 
 func GetTorrent(url string) (*Torrent, error) {
@@ -63,6 +64,8 @@ func GetTorrent(url string) (*Torrent, error) {
 		var torrent Torrent
 		err := bencode.NewDecoder(resp.Body).Decode(&torrent)
 		if err == nil {
+			torrent.PrettyName = torrent.Info.Name
+			torrent.URL = torrent.PublisherUrl
 			res = &torrent
 		}
 	} else {

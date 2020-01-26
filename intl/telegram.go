@@ -245,7 +245,7 @@ func (tg *Telegram) announce(action string, torrent *Torrent) {
 	} else {
 		Logger.Debugf("Announcing %s for %s", action, torrent.Info.Name)
 		msg := tg.Messages.Announce
-		name := torrent.Info.Name
+		name := torrent.PrettyName
 		if tg.Messages.Replacements != nil {
 			for k, v := range tg.Messages.Replacements {
 				name = strings.Replace(name, k, v, -1)

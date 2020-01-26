@@ -149,7 +149,7 @@ func (cr *Observer) Engage() {
 											prettyNameBytes != nil {
 											prettyName := string(prettyNameBytes)
 											if prettyName != "" {
-												torrent.Info.Name = fmt.Sprintf("%s (%s)", html.UnescapeString(prettyName), torrent.Info.Name)
+												torrent.PrettyName = fmt.Sprintf("%s (%s)", html.UnescapeString(prettyName), torrent.Info.Name)
 												torrent.PublisherUrl = nameUrl
 											}
 										}
