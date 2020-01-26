@@ -71,7 +71,7 @@ Uses:
 			- `${admin}` - is this chat has admin privilegies
 			- `${watch}` - is this chat subscribed to announces
 			- `${index}` - next check index
-		- auth - string - response to `/setadmin`, `/rmadmin`, `/lschats`, `/lsadmins` if unauthorized (OTP invalid)
+		- auth - string - response to `/setadmin`, `/rmadmin`, `/lschats`, `/lsadmins` if unauthorized (OTP invalid or not admin)
 		- unknown - string - response to unsupported command
 
 ### Extract name and image actions
@@ -144,8 +144,8 @@ if so, calls `extract` with data, recieved from `go` action (3)
 ### Admins
 In TTObserverV1, administrators are (currently) only chats, that recieve messages about target unavailable and list chats and other admins, which subscribed to announces bot.
 To become admin, chat should call `/setadmin 123456` in telegram, where 123456 - is an OTP, seeded by `adminotpseed`,
-to revoke admin call `/rmadmin 123456`,
-to list admins - `/lsadmins 123456`,
+to revoke admin call `/rmadmin`,
+to list admins - `/lsadmins`,
 to list chats - `/lschats`.
 
 ## Differences between V0 and V1

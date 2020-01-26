@@ -139,7 +139,7 @@ func (tg *Telegram) processCommand(msg *tlg.Message) {
 			resp = tg.Messages.Commands.Unauthorized
 		}
 	case cmdRmAdmin:
-		if tg.checkOtp(msg.CommandArguments()) {
+		if isAdmin, err := tg.DB.GetAdminExist(chat); isAdmin {
 			if err := tg.DB.DelAdmin(chat); err == nil {
 				Logger.Noticef("Admin deleted %d", chat)
 				resp = tg.Messages.Commands.RmAdmin
@@ -148,11 +148,16 @@ func (tg *Telegram) processCommand(msg *tlg.Message) {
 				resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
 			}
 		} else {
-			Logger.Infof("RmAdmin unauthorized %d", chat)
-			resp = tg.Messages.Commands.Unauthorized
+			if err == nil {
+				Logger.Infof("RmAdmin unauthorized %d", chat)
+				resp = tg.Messages.Commands.Unauthorized
+			} else {
+				Logger.Warningf("RmAdmin: %v", err)
+				resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
+			}
 		}
 	case cmdLsAdmins:
-		if tg.checkOtp(msg.CommandArguments()) {
+		if isAdmin, err := tg.DB.GetAdminExist(chat); isAdmin {
 			if admins, err := tg.DB.GetAdmins(); err == nil {
 				Logger.Noticef("LsAdmins called %d", chat)
 				sb := strings.Builder{}
@@ -165,11 +170,16 @@ func (tg *Telegram) processCommand(msg *tlg.Message) {
 				resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
 			}
 		} else {
-			Logger.Infof("LsAdmins unauthorized %d", chat)
-			resp = tg.Messages.Commands.Unauthorized
+			if err == nil {
+				Logger.Infof("LsAdmins unauthorized %d", chat)
+				resp = tg.Messages.Commands.Unauthorized
+			} else {
+				Logger.Warningf("LsAdmins: %v", err)
+				resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
+			}
 		}
 	case cmdLsChats:
-		if tg.checkOtp(msg.CommandArguments()) {
+		if isAdmin, err := tg.DB.GetAdminExist(chat); isAdmin {
 			if chats, err := tg.DB.GetChats(); err == nil {
 				Logger.Noticef("LsChats called %d", chat)
 				sb := strings.Builder{}
@@ -182,8 +192,13 @@ func (tg *Telegram) processCommand(msg *tlg.Message) {
 				resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
 			}
 		} else {
-			Logger.Infof("LsChats unauthorized %d", chat)
-			resp = tg.Messages.Commands.Unauthorized
+			if err == nil {
+				Logger.Infof("LsChats unauthorized %d", chat)
+				resp = tg.Messages.Commands.Unauthorized
+			} else {
+				Logger.Warningf("LsChats: %v", err)
+				resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
+			}
 		}
 	}
 	tg.sendMsg(resp, nil, []int64{chat}, false)
