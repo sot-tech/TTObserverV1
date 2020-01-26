@@ -53,6 +53,8 @@ const (
 	cmdState    = "state"
 	cmdSetAdmin = "setadmin"
 	cmdRmAdmin  = "rmadmin"
+	cmdLsAdmins = "lsadmins"
+	cmdLsChats  = "lschats"
 )
 
 type Messages struct {
@@ -149,6 +151,40 @@ func (tg *Telegram) processCommand(msg *tlg.Message) {
 			Logger.Infof("RmAdmin unauthorized %d", chat)
 			resp = tg.Messages.Commands.Unauthorized
 		}
+	case cmdLsAdmins:
+		if tg.checkOtp(msg.CommandArguments()) {
+			if admins, err := tg.DB.GetAdmins(); err == nil {
+				Logger.Noticef("LsAdmins called %d", chat)
+				sb := strings.Builder{}
+				for _, id := range admins{
+					sb.WriteString(fmt.Sprintf("%d: %s\n", id, tg.GetChatName(id)))
+				}
+				resp = sb.String()
+			} else {
+				Logger.Warningf("LsAdmins: %v", err)
+				resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
+			}
+		} else {
+			Logger.Infof("LsAdmins unauthorized %d", chat)
+			resp = tg.Messages.Commands.Unauthorized
+		}
+	case cmdLsChats:
+		if tg.checkOtp(msg.CommandArguments()) {
+			if chats, err := tg.DB.GetChats(); err == nil {
+				Logger.Noticef("LsChats called %d", chat)
+				sb := strings.Builder{}
+				for _, id := range chats{
+					sb.WriteString(fmt.Sprintf("%d: %s\n", id, tg.GetChatName(id)))
+				}
+				resp = sb.String()
+			} else {
+				Logger.Warningf("LsChats: %v", err)
+				resp = strings.Replace(tg.Messages.Error, msgErrorMsg, err.Error(), -1)
+			}
+		} else {
+			Logger.Infof("LsChats unauthorized %d", chat)
+			resp = tg.Messages.Commands.Unauthorized
+		}
 	}
 	tg.sendMsg(resp, nil, []int64{chat}, false)
 }
@@ -194,7 +230,7 @@ func (tg *Telegram) sendMsg(msgText string, msgPhoto []byte, chats []int64, form
 				var photoMsg tlg.PhotoConfig
 				if photoId == "" {
 					photoMsg = tlg.NewPhotoUpload(chat, tlg.FileBytes{Bytes: msgPhoto})
-				} else{
+				} else {
 					photoMsg = tlg.NewPhotoShare(chat, photoId)
 				}
 				photoMsg.Caption = msgText
@@ -202,7 +238,7 @@ func (tg *Telegram) sendMsg(msgText string, msgPhoto []byte, chats []int64, form
 					photoMsg.ParseMode = "Markdown"
 				}
 				msg = photoMsg
-			} else{
+			} else {
 				msgText := tlg.NewMessage(chat, msgText)
 				if formatted {
 					msgText.ParseMode = "Markdown"
@@ -211,7 +247,7 @@ func (tg *Telegram) sendMsg(msgText string, msgPhoto []byte, chats []int64, form
 			}
 			if sentMsg, err := tg.Bot.Send(msg); err == nil {
 				Logger.Debugf("Message to %d has been sent", chat)
-				if photoId == "" && sentMsg.Photo != nil && len(*sentMsg.Photo) > 0{
+				if photoId == "" && sentMsg.Photo != nil && len(*sentMsg.Photo) > 0 {
 					photoId = (*sentMsg.Photo)[0].FileID
 				}
 			} else {
@@ -286,6 +322,18 @@ func (tg *Telegram) UnaiwailNotify(count uint, err string) {
 		msg := strings.Replace(tg.Messages.Error, msgErrorMsg, fmt.Sprintf("%s (try %d)", err, count), -1)
 		tg.SendMsgToAdmins(msg, nil)
 	}
+}
+
+func (tg *Telegram) GetChatName(chatId int64) string {
+	name := "Unknown"
+	if chat, err := tg.Bot.GetChat(tlg.ChatConfig{
+		ChatID: chatId,
+	}); err == nil {
+		name = chat.UserName
+	} else {
+		Logger.Warning(err)
+	}
+	return name
 }
 
 func (tg *Telegram) Connect(token, otpSeed string, tries int) error {

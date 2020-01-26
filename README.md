@@ -1,12 +1,14 @@
 # TTObserverV1
 Torrent tracker site release watcher and telegram notifier.
 Can:
+
  - Watch tracker site for new torrent releases (it enumerates serial IDs and searches for torrent-like data)
  - Notify Telegram chats about new release
  - Determine pretty name of release from tracker site
  - Fetch and send release poster to telegram's message 
 
 Uses:
+
  - [go-logging (BSD-3)](https://github.com/op/go-logging)
  - [Go Bencode (MIT)](https://github.com/zeebo/bencode)
  - [Go-telegram-bot-api (MIT)](https://github.com/go-telegram-bot-api/telegram-bot-api)
@@ -15,6 +17,7 @@ Uses:
  
 # Usage
 ## Quick start
+
 1. Compile sources from `cmd/ttobserver` with `make`
 2. Copy example config and database from `conf` to place you want
 3. Rename and modify `example.json` with your values
@@ -68,7 +71,7 @@ Uses:
 			- `${admin}` - is this chat has admin privilegies
 			- `${watch}` - is this chat subscribed to announces
 			- `${index}` - next check index
-		- auth - string - response to `/setadmin` or `/rmadmin` if unauthorized (OTP invalid)
+		- auth - string - response to `/setadmin`, `/rmadmin`, `/lschats`, `/lsadmins` if unauthorized (OTP invalid)
 		- unknown - string - response to unsupported command
 
 ### Extract name and image actions
@@ -139,9 +142,11 @@ if so, calls `extract` with data, recieved from `go` action (3)
 6. Program stops iteration of `extract` action (2) and stores data.
 
 ### Admins
-In TTObserverV1, administrators are (currently) only chats, that recieve messages about target unavailable.
+In TTObserverV1, administrators are (currently) only chats, that recieve messages about target unavailable and list chats and other admins, which subscribed to announces bot.
 To become admin, chat should call `/setadmin 123456` in telegram, where 123456 - is an OTP, seeded by `adminotpseed`,
-to revoke admin call `/rmadmin 123456`.
+to revoke admin call `/rmadmin 123456`,
+to list admins - `/lsadmins 123456`,
+to list chats - `/lschats`.
 
 ## Differences between V0 and V1
 1. V0 could notify about releases, but also upload torrent to remote transmission server, V1 can't (and not planned)
