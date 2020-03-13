@@ -1,7 +1,5 @@
-/bin
-/pkg
-/src
 /*.log
 /.idea
-/conf/tt.db
-/conf/tt.json
+/conf/*
+!/conf/example.*
+/go.sum

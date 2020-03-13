@@ -24,7 +24,7 @@
  * OF SUCH DAMAGE.
  */
 
-package intl
+package TTObserver
 
 import (
 	"database/sql"
@@ -84,7 +84,8 @@ func (db *Database) getIntArray(query string, args ...interface{}) ([]int64, err
 				if err := rows.Scan(&element); err == nil {
 					arr = append(arr, element)
 				} else {
-					Logger.Errorf("Unable to append row value: %v", err)
+					arr = nil
+					break
 				}
 			}
 		}

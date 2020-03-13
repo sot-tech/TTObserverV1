@@ -27,35 +27,18 @@
 package TTObserver
 
 import (
-	"./intl"
-	"container/list"
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/op/go-logging"
 	"html"
 	"io/ioutil"
-	"math"
 	"math/rand"
-	"net/http"
-	"regexp"
+	"sot-te.ch/HTExtractor"
+	tg "sot-te.ch/MTHelper"
 	"strings"
+	tmpl "text/template"
 	"time"
 )
-
-const (
-	actGo      = "go"
-	actExtract = "extract"
-	actCheck   = "check"
-	actReturn  = "return"
-
-	paramTorrent = "${torrent}"
-	paramArg     = "${arg}"
-)
-
-type ExtractAction struct {
-	Action string `json:"action"`
-	Param  string `json:"param"`
-}
 
 type Observer struct {
 	Log struct {
@@ -63,24 +46,40 @@ type Observer struct {
 		Level string `json:"level"`
 	} `json:"log"`
 	Crawler struct {
-		URL struct {
-			Base                string          `json:"base"`
-			Torrent             string          `json:"torrent"`
-			ExtractNameActions  []ExtractAction `json:"extractnameactions"`
-			ExtractImageActions []ExtractAction `json:"extractimageactions"`
-		} `json:"url"`
-		Threshold      uint `json:"threshold"`
-		ErrorThreshold uint `json:"errorthreshold"`
-		Delay          uint `json:"delay"`
+		BaseURL        string                      `json:"baseurl"`
+		ContextURL     string                      `json:"contexturl"`
+		Delay          uint                        `json:"delay"`
+		Threshold      uint                        `json:"threshold"`
+		MetaActions    []HTExtractor.ExtractAction `json:"metaactions"`
+		ImageMetaField string                      `json:"imagemetafield"`
+		MetaExtractor  *HTExtractor.Extractor      `json:"-"`
 	} `json:"crawler"`
-	TryExtractPrettyName bool          `json:"tryextractprettyname"`
-	TryExtractImage      bool          `json:"tryextractimage"`
-	SizeThreshold        float64       `json:"sizethreshold"`
-	TelegramToken        string        `json:"telegramtoken"`
-	AdminOTPSeed         string        `json:"adminotpseed"`
-	DBFile               string        `json:"dbfile"`
-	Messages             intl.Messages `json:"msg"`
+	Telegram struct {
+		ApiId     int32        `json:"apiid"`
+		ApiHash   string       `json:"apihash"`
+		BotToken  string       `json:"bottoken"`
+		DBPath    string       `json:"dbpath"`
+		FileStore string       `json:"filestorepath"`
+		OTPSeed   string       `json:"otpseed"`
+		Client    *tg.Telegram `json:"-"`
+	} `json:"telegram"`
+	Messages struct {
+		tg.TGMessages
+		State        string            `json:"state"`
+		stateTmpl    *tmpl.Template    `json:"-"`
+		Announce     string            `json:"announce"`
+		announceTmpl *tmpl.Template    `json:"-"`
+		N1000        string            `json:"n1000"`
+		n1000Tmpl    *tmpl.Template    `json:"-"`
+		Replacements map[string]string `json:"replacements"`
+		Added        string            `json:"added"`
+		Updated      string            `json:"updated"`
+	} `json:"msg"`
+	DBFile string    `json:"dbfile"`
+	DB     *Database `json:"-"`
 }
+
+var logger = logging.MustGetLogger("observer")
 
 func ReadConfig(path string) (*Observer, error) {
 	var config Observer
@@ -91,243 +90,124 @@ func ReadConfig(path string) (*Observer, error) {
 	return &config, err
 }
 
-func (cr *Observer) Engage() {
-	database := &intl.Database{}
-	telegram := &intl.Telegram{
-		Messages: cr.Messages,
-		DB:       database,
+func (cr *Observer) Init() error {
+	db := &Database{}
+	if err := db.Connect(cr.DBFile); err != nil {
+		return err
 	}
-	err := database.Connect(cr.DBFile)
-	if err == nil {
-		defer database.Close()
-		err = telegram.Connect(cr.TelegramToken, cr.AdminOTPSeed, -1)
-		if err == nil {
-			go telegram.HandleUpdates()
-			baseOffset, err := database.GetCrawlOffset()
-			if err != nil {
-				intl.Logger.Error(err)
-			}
-			var errCount uint
-			for {
-				var i, offset uint
-				offset = baseOffset
-				wasError := false
-				for i = 0; i < cr.Crawler.Threshold; i++ {
-					currentOffset := offset + i
-					intl.Logger.Debugf("Checking offset %d", currentOffset)
-					torrentContext := fmt.Sprintf(cr.Crawler.URL.Torrent, currentOffset)
-					fullUrl := cr.Crawler.URL.Base + torrentContext
-					if torrent, err := intl.GetTorrent(fullUrl); err == nil {
-						wasError = false
-						errCount = 0
-						if torrent != nil {
-							intl.Logger.Infof("New file %s", torrent.Info.Name)
-							torrent.URL = fullUrl
-							newSize := torrent.FullSize()
-							intl.Logger.Infof("New torrent size %d", newSize)
-							if newSize > 0 {
-								isNew := true
-								announce := true
-								existSize, err := database.GetTorrentSize(torrent.Info.Name)
-								if err != nil {
-									intl.Logger.Error(err)
-								}
-								intl.Logger.Debugf("Existing torrent size: %d", existSize)
-								if existSize > 0 {
-									size0, size1 := float64(existSize), float64(newSize)
-									diff := 100 - math.Abs(size0*100.0/size1)
-									if diff > cr.SizeThreshold {
-										isNew = false
-									} else {
-										intl.Logger.Infof("Size diff is less than threshold: %d (%.1f%% diff)", newSize, diff)
-										announce = false
-									}
-								}
-								if announce {
-									if cr.TryExtractPrettyName {
-										if prettyNameBytes, nameUrl := cr.ExtractData(torrentContext, cr.Crawler.URL.ExtractNameActions);
-											prettyNameBytes != nil {
-											prettyName := string(prettyNameBytes)
-											if prettyName != "" {
-												torrent.PrettyName = fmt.Sprintf("%s (%s)", html.UnescapeString(prettyName), torrent.Info.Name)
-												torrent.PublisherUrl = nameUrl
-											}
-										}
-									}
-									if cr.TryExtractImage {
-										if imageBytes, _ := cr.ExtractData(torrentContext, cr.Crawler.URL.ExtractImageActions);
-											imageBytes != nil {
-											torrent.Poster = imageBytes
-										}
-									}
-									if isNew {
-										go telegram.AnnounceNew(torrent)
-									} else {
-										go telegram.AnnounceUpdate(torrent)
-									}
-									if currentOffset%1000 == 0 {
-										go telegram.N1000Get(currentOffset)
-									}
-								}
-								if err := database.UpdateTorrent(torrent.Info.Name, newSize); err != nil {
-									intl.Logger.Error(err)
-								}
-								baseOffset = currentOffset + 1
-								if err := database.UpdateCrawlOffset(baseOffset); err != nil {
-									intl.Logger.Error(err)
-								}
-							} else {
-								intl.Logger.Errorf("Zero torrent size, offset %d", currentOffset)
-							}
-						} else {
-							intl.Logger.Debugf("%s not a torrent", fullUrl)
-						}
-					} else {
-						wasError = true
-						intl.Logger.Errorf("Crawling error: %v", err)
-						if errCount > 0 && errCount%cr.Crawler.ErrorThreshold == 0 {
-							go telegram.UnaiwailNotify(errCount, err.Error())
-						}
-						break
-					}
-				}
-				if wasError {
-					errCount++
-				}
-				sleepTime := time.Duration(rand.Intn(int(cr.Crawler.Delay)) + int(cr.Crawler.Delay))
-				intl.Logger.Debugf("Sleeping %d sec", sleepTime)
-				time.Sleep(sleepTime * time.Second)
-			}
+	cr.DB = db
+	if err := cr.initTg(); err != nil {
+		return err
+	}
+	logger.Debug("Initiating meta extractor")
+	if len(cr.Crawler.MetaActions) == 0 {
+		logger.Warning("extract actions not set")
+	} else {
+		ex := HTExtractor.New()
+		if err := ex.Compile(cr.Crawler.MetaActions); err == nil {
+			cr.Crawler.MetaExtractor = ex
+		} else {
+			return err
 		}
 	}
-	if err != nil {
-		intl.Logger.Fatal(err)
+	var err error
+	if cr.Messages.announceTmpl, err = tmpl.New("announce").Parse(cr.Messages.Announce); err != nil {
+		logger.Error(err)
+	}
+	if cr.Messages.stateTmpl, err = tmpl.New("state").Parse(cr.Messages.State); err != nil {
+		logger.Error(err)
+	}
+	if cr.Messages.n1000Tmpl, err = tmpl.New("n1000").Parse(cr.Messages.N1000); err != nil {
+		logger.Error(err)
+	}
+	return nil
+}
+
+func (cr *Observer) Engage() {
+	defer cr.DB.Close()
+	defer cr.Telegram.Client.Close()
+	var err error
+	var nextOffset uint
+	if nextOffset, err = cr.DB.GetCrawlOffset(); err == nil {
+		go cr.Telegram.Client.HandleUpdates()
+		for {
+			newNextOffset := nextOffset
+			for offsetToCheck := nextOffset; offsetToCheck < nextOffset+cr.Crawler.Threshold; offsetToCheck++ {
+				if cr.checkTorrent(offsetToCheck){
+					newNextOffset = offsetToCheck + 1
+				}
+			}
+			if newNextOffset > nextOffset {
+				nextOffset = newNextOffset
+				if err = cr.DB.UpdateCrawlOffset(nextOffset); err != nil {
+					logger.Error(err)
+				}
+			}
+			sleepTime := time.Duration(rand.Intn(int(cr.Crawler.Delay)) + int(cr.Crawler.Delay))
+			logger.Debugf("Sleeping %d sec", sleepTime)
+			time.Sleep(sleepTime * time.Second)
+		}
+	} else {
+		logger.Fatal(err)
 	}
 }
 
-func (cr *Observer) ExtractData(context string, actions []ExtractAction) ([]byte, string) {
-	var lastUrl string
-	var res []byte
-	funcs := list.New()
-	var f *list.Element
-	stop := false
-	for actIndex := len(actions) - 1; actIndex >= 0; actIndex-- {
-		action := actions[actIndex]
-		var currentFunc func([]byte)
-		switch action.Action {
-		case actGo:
-			currentFunc = func(paramBytes []byte) {
-				var nextFunc func([]byte)
-				var param string
-				if paramBytes != nil {
-					param = string(paramBytes)
+func (cr *Observer) checkTorrent(offset uint) bool {
+	var res bool
+	logger.Debug("Checking offset ", offset)
+	fullContext := fmt.Sprintf(cr.Crawler.ContextURL, offset)
+	if torrent, err := GetTorrent(cr.Crawler.BaseURL + fullContext); err == nil {
+		if torrent != nil {
+			logger.Info("New file", torrent.Info.Name)
+			newSize := torrent.FullSize()
+			logger.Info("New torrent size", newSize)
+			if newSize > 0 {
+				var existSize uint64
+				if existSize, err = cr.DB.GetTorrentSize(torrent.Info.Name); err != nil {
+					logger.Error(err)
 				}
-				if f != nil {
-					f = f.Next()
-					if f != nil {
-						nextFunc = f.Value.(func([]byte))
-					}
+				cr.notify(torrent, fullContext, existSize == 0)
+				if offset%1000 == 0 {
+					cr.n1000Get(offset)
 				}
-				url := strings.Replace(action.Param, paramArg, param, -1)
-				url = strings.Replace(url, paramTorrent, context, -1)
-				if strings.Index(param, cr.Crawler.URL.Base) < 0 {
-					url = cr.Crawler.URL.Base + url
+				if err = cr.DB.UpdateTorrent(torrent.Info.Name, newSize); err != nil {
+					logger.Error(err)
 				}
-				if resp, err := http.Get(url); err == nil && resp != nil && resp.StatusCode < 400 {
-					lastUrl = url
-					if bytes, err := ioutil.ReadAll(resp.Body); err == nil {
-						if nextFunc != nil {
-							nextFunc(bytes)
-						}
-					} else {
-						intl.Logger.Warningf("Read body error: %v", err)
-					}
-				} else {
-					var errMsg string
-					if err != nil {
-						errMsg = err.Error()
-					} else if resp == nil {
-						errMsg = "empty response"
-					} else {
-						errMsg = resp.Status
-					}
-					err = errors.New(errMsg)
-					intl.Logger.Warningf("HTTP error: %s", errMsg)
-				}
+				res = true
+			} else {
+				logger.Error("Zero torrent size, offset", offset)
 			}
-		case actExtract:
-			currentFunc = func(param []byte) {
-				var nextFunc func([]byte)
-				if f != nil {
-					f = f.Next()
-					if f != nil {
-						nextFunc = f.Value.(func([]byte))
-					}
-				}
-				if param == nil {
-					param = make([]byte, 0)
-				}
-				pattern := strings.Replace(action.Param, paramTorrent, context, -1)
-				if reg, err := regexp.Compile("(?s)" + pattern); err == nil {
-					matches := reg.FindAllSubmatch(param, -1)
-					if matches != nil {
-						for _, match := range matches {
-							if match != nil && len(match) > 1 {
-								if nextFunc != nil {
-									tmpF := f
-									nextFunc(match[1])
-									f = tmpF
-								}
-							}
-							if stop {
-								break
-							}
-						}
-					}
-				} else {
-					intl.Logger.Warning(err)
-				}
-			}
-		case actCheck:
-			currentFunc = func(param []byte) {
-				var nextFunc func([]byte)
-				if f != nil {
-					f = f.Next()
-					if f != nil {
-						nextFunc = f.Value.(func([]byte))
-					}
-				}
-				if param == nil {
-					param = make([]byte, 0)
-				}
-				if action.Param == "" {
-					if len(param) > 0 && nextFunc != nil {
-						nextFunc(param)
-					}
-				} else {
-					pattern := strings.Replace(action.Param, paramTorrent, context, -1)
-					if reg, err := regexp.Compile("(?s)" + pattern); err == nil {
-						if matches := reg.FindSubmatch(param); matches != nil && len(matches) > 0 {
-							if nextFunc != nil {
-								nextFunc(param)
-							}
-						}
+		} else {
+			logger.Debugf("%s not a torrent", fullContext)
+		}
+	}
+	return res
+}
+
+func (cr *Observer) notify(torrent *Torrent, context string, isNew bool) {
+	var err error
+	var meta map[string]string
+	var poster []byte
+	if cr.Crawler.MetaExtractor != nil {
+		var rawMeta map[string][]byte
+		if rawMeta, err = cr.Crawler.MetaExtractor.ExtractData(cr.Crawler.BaseURL, context); err == nil && len(rawMeta) > 0 {
+			meta = make(map[string]string, len(rawMeta))
+			for k, v := range rawMeta {
+				if len(k) > 0 {
+					if k != cr.Crawler.ImageMetaField {
+						meta[k] = strings.TrimSpace(html.UnescapeString(string(v)))
 					} else {
-						intl.Logger.Warning(err)
+						poster = v
 					}
 				}
-			}
-		case actReturn:
-			currentFunc = func(param []byte) {
-				res = param
-				stop = true
 			}
 		}
-		funcs.PushFront(currentFunc)
 	}
-	if funcs.Len() > 0 {
-		f = funcs.Front()
-		f.Value.(func([]byte))(nil)
+	if err != nil{
+		logger.Error(err)
 	}
-	return res, lastUrl
+	torrent.Meta = meta
+	torrent.Poster = poster
+	torrent.URL = cr.Crawler.BaseURL + context
+	cr.announce(isNew, torrent)
 }

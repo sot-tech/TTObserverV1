@@ -24,7 +24,7 @@
  * OF SUCH DAMAGE.
  */
 
-package intl
+package TTObserver
 
 import (
 	"errors"
@@ -52,19 +52,19 @@ type Torrent struct {
 		PieceLength uint64 `bencode:"piece length"`
 		Pieces      []byte `bencode:"pieces"`
 	} `bencode:"info"`
-	URL        string `bencode:"-"`
-	Poster     []byte `bencode:"-"`
-	PrettyName string `bencode:"-"`
+	URL    string            `bencode:"-"`
+	Poster []byte            `bencode:"-"`
+	Meta   map[string]string `bencode:"-"`
 }
 
 func GetTorrent(url string) (*Torrent, error) {
 	var res *Torrent
 	var err error
 	if resp, httpErr := http.Get(url); httpErr == nil && resp != nil && resp.StatusCode < 400 {
+		defer resp.Body.Close()
 		var torrent Torrent
 		err := bencode.NewDecoder(resp.Body).Decode(&torrent)
 		if err == nil {
-			torrent.PrettyName = torrent.Info.Name
 			torrent.URL = torrent.PublisherUrl
 			res = &torrent
 		}

@@ -24,8 +24,59 @@
  * OF SUCH DAMAGE.
  */
 
-package intl
+package main
 
-import "github.com/op/go-logging"
+import (
+	"flag"
+	"github.com/op/go-logging"
+	"io"
+	"os"
+	"os/signal"
+	"sot-te.ch/TTObserverV1"
+	"syscall"
+)
 
-var Logger = logging.MustGetLogger("observer")
+func main() {
+	flag.Parse()
+	args := flag.Args()
+	logger := logging.MustGetLogger("main")
+	if len(args) == 0 {
+		logger.Fatal("Observer file not set")
+	}
+	filename := args[0]
+	crawler, err := TTObserver.ReadConfig(filename)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	var outputWriter io.Writer
+	if crawler.Log.File == "" {
+		outputWriter = os.Stdout
+	} else {
+		outputWriter, err = os.OpenFile(crawler.Log.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
+	}
+	if err == nil {
+		backend := logging.AddModuleLevel(
+			logging.NewBackendFormatter(
+				logging.NewLogBackend(outputWriter, "", 0),
+				logging.MustStringFormatter("%{time:2006-01-02 15:04:05.000}\t%{shortfile}\t%{shortfunc}\t%{level}:\t%{message}")))
+		var level logging.Level
+		if level, err = logging.LogLevel(crawler.Log.Level); err != nil {
+			println(err)
+			level = logging.INFO
+		}
+		backend.SetLevel(level, "")
+		logging.SetBackend(backend)
+	} else {
+		println(err)
+	}
+
+	if err = crawler.Init(); err == nil {
+		go crawler.Engage()
+		ch := make(chan os.Signal, 2)
+		signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
+		<-ch
+	} else{
+		println(err)
+	}
+}
