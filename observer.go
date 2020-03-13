@@ -50,6 +50,7 @@ type Observer struct {
 		ContextURL     string                      `json:"contexturl"`
 		Delay          uint                        `json:"delay"`
 		Threshold      uint                        `json:"threshold"`
+		Anniversary    uint                        `json:"anniversary"`
 		MetaActions    []HTExtractor.ExtractAction `json:"metaactions"`
 		ImageMetaField string                      `json:"imagemetafield"`
 		MetaExtractor  *HTExtractor.Extractor      `json:"-"`
@@ -69,8 +70,8 @@ type Observer struct {
 		stateTmpl    *tmpl.Template    `json:"-"`
 		Announce     string            `json:"announce"`
 		announceTmpl *tmpl.Template    `json:"-"`
-		N1000        string            `json:"n1000"`
-		n1000Tmpl    *tmpl.Template    `json:"-"`
+		Nx           string            `json:"n1x"`
+		nxTmpl       *tmpl.Template    `json:"-"`
 		Replacements map[string]string `json:"replacements"`
 		Added        string            `json:"added"`
 		Updated      string            `json:"updated"`
@@ -117,7 +118,7 @@ func (cr *Observer) Init() error {
 	if cr.Messages.stateTmpl, err = tmpl.New("state").Parse(cr.Messages.State); err != nil {
 		logger.Error(err)
 	}
-	if cr.Messages.n1000Tmpl, err = tmpl.New("n1000").Parse(cr.Messages.N1000); err != nil {
+	if cr.Messages.nxTmpl, err = tmpl.New("n1000").Parse(cr.Messages.Nx); err != nil {
 		logger.Error(err)
 	}
 	return nil
@@ -133,7 +134,7 @@ func (cr *Observer) Engage() {
 		for {
 			newNextOffset := nextOffset
 			for offsetToCheck := nextOffset; offsetToCheck < nextOffset+cr.Crawler.Threshold; offsetToCheck++ {
-				if cr.checkTorrent(offsetToCheck){
+				if cr.checkTorrent(offsetToCheck) {
 					newNextOffset = offsetToCheck + 1
 				}
 			}
@@ -167,8 +168,8 @@ func (cr *Observer) checkTorrent(offset uint) bool {
 					logger.Error(err)
 				}
 				cr.notify(torrent, fullContext, existSize == 0)
-				if offset%1000 == 0 {
-					cr.n1000Get(offset)
+				if offset > 0 && offset%cr.Crawler.Anniversary == 0 {
+					cr.nxGet(offset)
 				}
 				if err = cr.DB.UpdateTorrent(torrent.Info.Name, newSize); err != nil {
 					logger.Error(err)
@@ -203,7 +204,7 @@ func (cr *Observer) notify(torrent *Torrent, context string, isNew bool) {
 			}
 		}
 	}
-	if err != nil{
+	if err != nil {
 		logger.Error(err)
 	}
 	torrent.Meta = meta

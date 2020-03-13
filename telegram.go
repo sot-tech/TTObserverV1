@@ -49,8 +49,8 @@ const (
 	msgFileCount = "filecount"
 	msgMeta      = "meta"
 
-	cmdLsAdmins = "lsadmins"
-	cmdLsChats  = "lschats"
+	cmdLsAdmins = "/lsadmins"
+	cmdLsChats  = "/lschats"
 )
 
 func formatMessage(tmpl *template.Template, values map[string]interface{}) (string, error) {
@@ -170,17 +170,21 @@ func (cr *Observer) sendMsgToMobs(msg string, photo []byte) {
 		}
 		var tmpFile *os.File
 		if tmpFile, err = ioutil.TempFile("", ext); err == nil {
-			defer tmpFile.Close()
 			if _, err = tmpFile.Write(photo); err == nil {
 				_ = tmpFile.Sync()
 				photoParams.Path = tmpFile.Name()
 			}
+			if err = tmpFile.Close(); err != nil{
+				logger.Error(err)
+			}
 		}
 	}
-	if len(photoParams.Path) > 0 {
-		defer os.Remove(photoParams.Path)
-	}
 	cr.Telegram.Client.SendPhoto(photoParams, msg, chats, true)
+	if len(photoParams.Path) > 0 {
+		if err = os.Remove(photoParams.Path); err != nil{
+			logger.Error(err)
+		}
+	}
 }
 
 func (cr *Observer) announce(new bool, torrent *Torrent) {
@@ -213,12 +217,12 @@ func (cr *Observer) announce(new bool, torrent *Torrent) {
 	}
 }
 
-func (cr *Observer) n1000Get(offset uint) {
-	if cr.Messages.N1000 == "" {
-		logger.Warning("N1000 message not set")
+func (cr *Observer) nxGet(offset uint) {
+	if cr.Messages.Nx == "" {
+		logger.Warning("Nx message not set")
 	} else {
 		logger.Debugf("Notifying %d GET", offset)
-		if msg, err := formatMessage(cr.Messages.n1000Tmpl, map[string]interface{}{
+		if msg, err := formatMessage(cr.Messages.nxTmpl, map[string]interface{}{
 			msgIndex: offset,
 		}); err == nil {
 			cr.sendMsgToMobs(msg, nil)
