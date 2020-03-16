@@ -1,97 +1,85 @@
 {
 	"log": {
-		"file": "tt.log",
-		"level": "DEBUG"
+		"file": "/var/log/tto.log",
+		"level": "WARNING"
 	},
 	"crawler": {
-		"url": {
-			"base": "http://site.local",
-			"torrent": "/content/torrent/%d",
-			"extractnameactions": [
-				{
-					"action": "go",
-					"param": "/catalog"
-				},
-				{
-					"action": "extract",
-					"param": "<p class=\"catalog_element\">.*?<a .*?href=\"(.*?)\".*?>"
-				},
-				{
-					"action": "go",
-					"param": "${arg}"
-				},
-				{
-					"action": "check",
-					"param": "<div class=\"release_torrent\">.*?<a class=\"button button_black\" href=\"\\Q${torrent}\\E\">"
-				},
-				{
-					"action": "extract",
-					"param": "<div class=\"main_title\">.*?<span>(.*?)</span>"
-				},
-				{
-					"action": "return",
-					"param": ""
-				}
-			],
-			"extractimageactions": [
-				{
-					"action": "go",
-					"param": "/catalog"
-				},
-				{
-					"action": "extract",
-					"param": "<p class=\"catalog_element\">.*?<a .*?href=\"(.*?)\".*?>"
-				},
-				{
-					"action": "go",
-					"param": "${arg}"
-				},
-				{
-					"action": "check",
-					"param": "<div class=\"release_torrent\">.*?<a class=\"button button_black\" href=\"\\Q${torrent}\\E\">"
-				},
-				{
-					"action": "extract",
-					"param": "<div id=\"release_main_poster\" style=\"background-image: url\\((.*?)\\)\".*?>"
-				},
-				{
-					"action": "go",
-					"param": "${arg}"
-				},
-				{
-					"action": "return",
-					"param": ""
-				}
-			]
-		},
+		"baseurl": "http://localhost.localdomain",
+		"contexturl": "/content/torrent/%d",
 		"threshold": 10,
-		"errorthreshold": 10,
-		"delay": 10
+		"delay": 10,
+		"anniversary": 100,
+		"metaactions": [
+			{
+				"action": "go",
+				"param": "/catalog"
+			},
+			{
+				"action": "extract",
+				"param": "<p class=\"catalog_info_name\">.*?<a .*?href=\"(?P<url>.*?)\".*?>"
+			},
+			{
+				"action": "store",
+				"param": ""
+			},
+			{
+				"action": "go",
+				"param": "${arg}"
+			},
+			{
+				"action": "findFirst",
+				"param": "<div class=\"release_torrent_butt\">.*?<a class=\"button button_black\" href=\"\\Q${search}\\E\">"
+			},
+			{
+				"action": "extract",
+				"param": "<div id=\"release_main_data[_a-zA-Z]*?\">[\\s\\r\\n]*?<div class=\"release_reln\">[\\s\\r\\n]*?<span>[\\s\\r\\n]*?(?P<name_en>.*?)[\\s\\r\\n]*?<\\/span>[\\s\\r\\n]*?<\\/div>|<div id=\"release_main_poster\" style=\"background-image: url\\((?P<poster>.*?)\\)\".*?>"
+			},
+			{
+				"action": "store",
+				"param": ""
+			},
+			{
+				"action": "findAll",
+				"param": "(?i).*\\.jpe?g|.*\\.png"
+			},
+			{
+				"action": "go",
+				"param": "${arg}"
+			},
+			{
+				"action": "store",
+				"param": "data"
+			}
+		],
+		"imagemetafield": "dataposter"
 	},
-	"tryextractprettyname": true,
-	"tryextractimage": true,
-	"sizethreshold": 5.0,
-	"telegramtoken": "123456:1234567890abcdef",
-	"adminotpseed": "BASE32LONGLONGSEEDSTRING",
-	"dbfile": "conf/example.db",
+	"telegram": {
+		"apiid": 123456,
+		"apihash":"kqwrvonebe34283on3on",
+		"bottoken": "123321:BOIBGvOUVUYVYBGIoiboiubib",
+		"dbpath": "/var/lib/tto/tgdb",
+		"filestorepath": "/tmp/tgf",
+		"otpseed": "SOMERANDOMBASE32LONGSTRING"
+	},
 	"msg": {
-		"announce": "*Torrent ${action}*\n`${name}:${size}`\n[Download](${url})\n",
-		"n1000": "New GET ${index}",
-		"added": "added",
-		"updated": "updated",
-		"error": "Operation error: ${msg}",
+		"announce": "**Torrent {{.action}}**\nName: `{{.meta.name_en}} (File name: {{.name}})`\nSize: `{{.size}}`\nFile count: `{{.filecount}}`\n[Download📥]({{.url}})\n",
+		"n1x": "Anniversary release🤘: {{.index}}",
+		"added": "Added",
+		"updated": "Updated",
+		"error": "Error: ",
+		"auth": "Unauthorized",
+		"state": "Observer: {{.watch}}\nAdmin: {{.admin}}\nNext index: {{.index}}",
 		"replacements": {
 			"_": " "
 		},
 		"cmds": {
-			"start": "Available commands:\n/start - this help\n/attach - subscribe\n/detach - unsubscribe\n/state - state of chat",
-			"attach": "Added to announce list",
-			"detach": "Removed from announce list",
-			"setadmin": "You now admin",
-			"rmadmin": "You now not admin",
-			"state": "Watch: ${watch}\nAdmin: ${admin}\nNext index: ${index}",
-			"auth": "Unauthorized",
+			"start": "Commands:\n/start\n/attach\n/detach\n/state\n/setadmin\n/rmadmin\n/lschats\n/lsadmins",
+			"attach": "Subscribed",
+			"detach": "Unsubscribed",
+			"setadmin": "Access granted",
+			"rmadmin": "Access revoked",
 			"unknown": "Unknown command"
 		}
-	}	
+	},
+	"dbfile": "var/lib/tto/tt.db"
 }
