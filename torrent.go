@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"github.com/zeebo/bencode"
 	"net/http"
+	"path/filepath"
 )
 
 type Torrent struct {
@@ -52,9 +53,9 @@ type Torrent struct {
 		PieceLength uint64 `bencode:"piece length"`
 		Pieces      []byte `bencode:"pieces"`
 	} `bencode:"info"`
-	URL    string            `bencode:"-"`
-	Poster []byte            `bencode:"-"`
-	Meta   map[string]string `bencode:"-"`
+	URL   string            `bencode:"-"`
+	Image []byte            `bencode:"-"`
+	Meta  map[string]string `bencode:"-"`
 }
 
 func GetTorrent(url string) (*Torrent, error) {
@@ -129,4 +130,20 @@ func (t *Torrent) StringSize() string {
 		res = fmt.Sprintf("%.2f %ciB", float64(size)/float64(d), s)
 	}
 	return res
+}
+
+func (t *Torrent) Files() []string {
+	var files []string
+	if t.Info.Files != nil {
+		for _, file := range t.Info.Files {
+			if file.Path != nil {
+				allParts := []string{t.Info.Name}
+				allParts = append(allParts, file.Path...)
+				files = append(files, "/"+filepath.Join(allParts...))
+			}
+		}
+	} else {
+		files = append(files, "/"+t.Info.Name)
+	}
+	return files
 }

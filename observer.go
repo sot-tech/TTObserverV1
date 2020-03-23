@@ -27,12 +27,18 @@
 package TTObserver
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/nfnt/resize"
 	"github.com/op/go-logging"
 	"html"
+	"image"
+	"image/jpeg"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"sot-te.ch/HTExtractor"
 	tg "sot-te.ch/MTHelper"
 	"strings"
@@ -46,14 +52,15 @@ type Observer struct {
 		Level string `json:"level"`
 	} `json:"log"`
 	Crawler struct {
-		BaseURL        string                      `json:"baseurl"`
-		ContextURL     string                      `json:"contexturl"`
-		Delay          uint                        `json:"delay"`
-		Threshold      uint                        `json:"threshold"`
-		Anniversary    uint                        `json:"anniversary"`
-		MetaActions    []HTExtractor.ExtractAction `json:"metaactions"`
-		ImageMetaField string                      `json:"imagemetafield"`
-		MetaExtractor  *HTExtractor.Extractor      `json:"-"`
+		BaseURL         string                      `json:"baseurl"`
+		ContextURL      string                      `json:"contexturl"`
+		Delay           uint                        `json:"delay"`
+		Threshold       uint                        `json:"threshold"`
+		Anniversary     uint                        `json:"anniversary"`
+		MetaActions     []HTExtractor.ExtractAction `json:"metaactions"`
+		ImageMetaField  string                      `json:"imagemetafield"`
+		ImageThumb      uint                        `json:"imagethumb"`
+		MetaExtractor   *HTExtractor.Extractor      `json:"-"`
 	} `json:"crawler"`
 	Telegram struct {
 		ApiId     int32        `json:"apiid"`
@@ -144,12 +151,40 @@ func (cr *Observer) Engage() {
 					logger.Error(err)
 				}
 			}
+			clearTemp()
 			sleepTime := time.Duration(rand.Intn(int(cr.Crawler.Delay)) + int(cr.Crawler.Delay))
 			logger.Debugf("Sleeping %d sec", sleepTime)
 			time.Sleep(sleepTime * time.Second)
 		}
 	} else {
 		logger.Fatal(err)
+	}
+}
+
+func (cr *Observer) PureEngage() {
+	defer cr.DB.Close()
+	defer cr.Telegram.Client.Close()
+	var err error
+	var nextOffset uint = 457
+	go cr.Telegram.Client.HandleUpdates()
+	for {
+		newNextOffset := nextOffset
+		for offsetToCheck := nextOffset; offsetToCheck < nextOffset+cr.Crawler.Threshold; offsetToCheck++ {
+			if cr.checkTorrent(offsetToCheck) {
+				newNextOffset = offsetToCheck + 1
+			}
+		}
+		if newNextOffset > nextOffset {
+			nextOffset = newNextOffset
+			if err = cr.DB.UpdateCrawlOffset(nextOffset); err != nil {
+				logger.Error(err)
+			}
+		} else {
+			break
+		}
+		sleepTime := time.Duration(rand.Intn(int(cr.Crawler.Delay)) + int(cr.Crawler.Delay))
+		logger.Debugf("Sleeping %d sec", sleepTime)
+		time.Sleep(sleepTime * time.Second)
 	}
 }
 
@@ -163,17 +198,20 @@ func (cr *Observer) checkTorrent(offset uint) bool {
 			newSize := torrent.FullSize()
 			logger.Info("New torrent size", newSize)
 			if newSize > 0 {
-				var existSize uint64
-				if existSize, err = cr.DB.GetTorrentSize(torrent.Info.Name); err != nil {
+				var torrentId int64
+				var isNew bool
+				if torrentId, err = cr.DB.GetTorrent(torrent.Info.Name); err != nil {
 					logger.Error(err)
 				}
-				cr.notify(torrent, fullContext, existSize == 0)
+				isNew = torrentId == invalidId
+				if torrentId, err = cr.DB.AddTorrent(torrent.Info.Name, torrent.Files()); err != nil {
+					logger.Error(err)
+				}
+				cr.notify(torrent, fullContext, torrentId, isNew)
 				if offset > 0 && offset%cr.Crawler.Anniversary == 0 {
 					cr.nxGet(offset)
 				}
-				if err = cr.DB.UpdateTorrent(torrent.Info.Name, newSize); err != nil {
-					logger.Error(err)
-				}
+
 				res = true
 			} else {
 				logger.Error("Zero torrent size, offset", offset)
@@ -185,21 +223,31 @@ func (cr *Observer) checkTorrent(offset uint) bool {
 	return res
 }
 
-func (cr *Observer) notify(torrent *Torrent, context string, isNew bool) {
+func (cr *Observer) notify(torrent *Torrent, context string, torrentId int64, isNew bool) {
 	var err error
 	var meta map[string]string
-	var poster []byte
+	var torrentImageUrl string
 	if cr.Crawler.MetaExtractor != nil {
-		var rawMeta map[string][]byte
-		if rawMeta, err = cr.Crawler.MetaExtractor.ExtractData(cr.Crawler.BaseURL, context); err == nil && len(rawMeta) > 0 {
-			meta = make(map[string]string, len(rawMeta))
-			for k, v := range rawMeta {
-				if len(k) > 0 {
-					if k != cr.Crawler.ImageMetaField {
-						meta[k] = strings.TrimSpace(html.UnescapeString(string(v)))
-					} else {
-						poster = v
+		for i := 47; i > 0; i-- {
+			logger.Infof("Searching %s in page %d", torrent.Info.Name, i)
+			var rawMeta map[string][]byte
+			if rawMeta, err = cr.Crawler.MetaExtractor.ExtractData(cr.Crawler.BaseURL + fmt.Sprintf("/anime/catalog/?PAGEN_1=%d", i), context);
+			err == nil && len(rawMeta) > 0 {
+				for k, v := range rawMeta{
+					logger.Info(k, "", string(v))
+				}
+				if len(rawMeta) > 1 {
+					meta = make(map[string]string, len(rawMeta))
+					for k, v := range rawMeta {
+						if len(k) > 0 {
+							s := strings.TrimSpace(html.UnescapeString(string(v)))
+							meta[k] = s
+							if k == cr.Crawler.ImageMetaField {
+								torrentImageUrl = s
+							}
+						}
 					}
+					break
 				}
 			}
 		}
@@ -207,8 +255,45 @@ func (cr *Observer) notify(torrent *Torrent, context string, isNew bool) {
 	if err != nil {
 		logger.Error(err)
 	}
+	if err = cr.DB.AddTorrentMeta(torrentId, meta); err != nil {
+		logger.Error(err)
+	}
+	var torrentImage []byte
+	if torrentImage, err = cr.DB.GetTorrentImage(torrentId); err == nil {
+		if len(torrentImage) == 0 {
+			if strings.Index(torrentImageUrl, cr.Crawler.BaseURL) < 0 {
+				torrentImageUrl = cr.Crawler.BaseURL + torrentImageUrl
+			}
+			if resp, httpErr := http.Get(torrentImageUrl); httpErr == nil && resp != nil && resp.StatusCode < 400 {
+				defer resp.Body.Close()
+				var img image.Image
+				if img, _, err = image.Decode(resp.Body); err == nil && img != nil {
+					img = resize.Thumbnail(cr.Crawler.ImageThumb, cr.Crawler.ImageThumb, img, resize.Bicubic)
+					imgBuffer := bytes.Buffer{}
+					if err = jpeg.Encode(&imgBuffer, img, nil); err == nil {
+						if torrentImage, err = ioutil.ReadAll(&imgBuffer); err == nil {
+							err = cr.DB.AddTorrentImage(torrentId, torrentImage)
+						}
+					}
+				}
+			} else {
+				errMsg := "crawling: "
+				if httpErr != nil {
+					errMsg += httpErr.Error()
+				} else if resp == nil {
+					errMsg += "empty response"
+				} else {
+					errMsg += resp.Status
+				}
+				err = errors.New(errMsg)
+			}
+		}
+	}
+	if err != nil {
+		logger.Error(err)
+	}
 	torrent.Meta = meta
-	torrent.Poster = poster
+	torrent.Image = torrentImage
 	torrent.URL = cr.Crawler.BaseURL + context
-	cr.announce(isNew, torrent)
+	//cr.announce(isNew, torrent)
 }

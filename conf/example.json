@@ -37,21 +37,10 @@
 			{
 				"action": "store",
 				"param": ""
-			},
-			{
-				"action": "findAll",
-				"param": "(?i).*\\.jpe?g|.*\\.png"
-			},
-			{
-				"action": "go",
-				"param": "${arg}"
-			},
-			{
-				"action": "store",
-				"param": "data"
 			}
 		],
-		"imagemetafield": "dataposter"
+		"imagemetafield": "poster",
+		"imagethumb": 1280
 	},
 	"telegram": {
 		"apiid": 123456,

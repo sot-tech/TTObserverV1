@@ -72,7 +72,7 @@ func main() {
 	}
 
 	if err = crawler.Init(); err == nil {
-		go crawler.Engage()
+		go crawler.PureEngage()
 		ch := make(chan os.Signal, 2)
 		signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
 		<-ch
