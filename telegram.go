@@ -28,7 +28,6 @@ package TTObserver
 
 import (
 	"bytes"
-	"container/list"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -37,7 +36,6 @@ import (
 	tg "sot-te.ch/MTHelper"
 	"strings"
 	"text/template"
-	"time"
 )
 
 const (
@@ -54,15 +52,7 @@ const (
 	cmdLsAdmins = "/lsadmins"
 	cmdLsChats  = "/lschats"
 
-	tmpTtl = 300
 )
-
-type tempFile struct {
-	name      string
-	timestamp int64
-}
-
-var tempFiles = list.New()
 
 func formatMessage(tmpl *template.Template, values map[string]interface{}) (string, error) {
 	var err error
@@ -184,7 +174,6 @@ func (cr *Observer) sendMsgToMobs(msg string, photo []byte) {
 			if _, err = tmpFile.Write(photo); err == nil {
 				_ = tmpFile.Sync()
 				photoParams.Path = tmpFile.Name()
-				tempFiles.PushBack(tempFile{photoParams.Path,time.Now().Unix()})
 			}
 			if err = tmpFile.Close(); err != nil {
 				logger.Error(err)
@@ -192,18 +181,9 @@ func (cr *Observer) sendMsgToMobs(msg string, photo []byte) {
 		}
 	}
 	cr.Telegram.Client.SendPhoto(photoParams, msg, chats, true)
-}
-
-func clearTemp(){
-	if tempFiles.Len() > 0{
-		for element := tempFiles.Front(); element != nil; element = element.Next(){
-			value := element.Value.(tempFile)
-			if value.timestamp + tmpTtl > time.Now().Unix(){
-				if err := os.Remove(value.name); err != nil{
-					logger.Error(err)
-				}
-				tempFiles.Remove(element)
-			}
+	if len(photoParams.Path) > 0 {
+		if err = os.Remove(photoParams.Path); err != nil {
+			logger.Error(err)
 		}
 	}
 }

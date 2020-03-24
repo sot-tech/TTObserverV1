@@ -35,7 +35,9 @@ import (
 	"github.com/op/go-logging"
 	"html"
 	"image"
+	_ "image/gif"
 	"image/jpeg"
+	_ "image/png"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -151,7 +153,6 @@ func (cr *Observer) Engage() {
 					logger.Error(err)
 				}
 			}
-			clearTemp()
 			sleepTime := time.Duration(rand.Intn(int(cr.Crawler.Delay)) + int(cr.Crawler.Delay))
 			logger.Debugf("Sleeping %d sec", sleepTime)
 			time.Sleep(sleepTime * time.Second)
@@ -228,15 +229,16 @@ func (cr *Observer) notify(torrent *Torrent, context string, torrentId int64, is
 	var meta map[string]string
 	var torrentImageUrl string
 	if cr.Crawler.MetaExtractor != nil {
-		for i := 47; i > 0; i-- {
-			logger.Infof("Searching %s in page %d", torrent.Info.Name, i)
+		//for i := 47; i > 0; i-- {
+		//	logger.Infof("Searching %s in page %d", torrent.Info.Name, i)
 			var rawMeta map[string][]byte
-			if rawMeta, err = cr.Crawler.MetaExtractor.ExtractData(cr.Crawler.BaseURL + fmt.Sprintf("/anime/catalog/?PAGEN_1=%d", i), context);
+			//if rawMeta, err = cr.Crawler.MetaExtractor.ExtractData(cr.Crawler.BaseURL + fmt.Sprintf("/anime/catalog/?PAGEN_1=%d", i), context);
+			if rawMeta, err = cr.Crawler.MetaExtractor.ExtractData(cr.Crawler.BaseURL, context);
 			err == nil && len(rawMeta) > 0 {
-				for k, v := range rawMeta{
-					logger.Info(k, "", string(v))
-				}
-				if len(rawMeta) > 1 {
+			//	for k, v := range rawMeta{
+			//		logger.Info(k, "", string(v))
+			//	}
+				//if len(rawMeta) > 1 {
 					meta = make(map[string]string, len(rawMeta))
 					for k, v := range rawMeta {
 						if len(k) > 0 {
@@ -247,10 +249,10 @@ func (cr *Observer) notify(torrent *Torrent, context string, torrentId int64, is
 							}
 						}
 					}
-					break
-				}
+				//	break
+				//}
 			}
-		}
+		//}
 	}
 	if err != nil {
 		logger.Error(err)
@@ -260,7 +262,7 @@ func (cr *Observer) notify(torrent *Torrent, context string, torrentId int64, is
 	}
 	var torrentImage []byte
 	if torrentImage, err = cr.DB.GetTorrentImage(torrentId); err == nil {
-		if len(torrentImage) == 0 {
+		if len(torrentImage) == 0 && len(torrentImageUrl) > 0 {
 			if strings.Index(torrentImageUrl, cr.Crawler.BaseURL) < 0 {
 				torrentImageUrl = cr.Crawler.BaseURL + torrentImageUrl
 			}
@@ -268,7 +270,9 @@ func (cr *Observer) notify(torrent *Torrent, context string, torrentId int64, is
 				defer resp.Body.Close()
 				var img image.Image
 				if img, _, err = image.Decode(resp.Body); err == nil && img != nil {
-					img = resize.Thumbnail(cr.Crawler.ImageThumb, cr.Crawler.ImageThumb, img, resize.Bicubic)
+					if cr.Crawler.ImageThumb > 0 {
+						img = resize.Thumbnail(cr.Crawler.ImageThumb, cr.Crawler.ImageThumb, img, resize.Bicubic)
+					}
 					imgBuffer := bytes.Buffer{}
 					if err = jpeg.Encode(&imgBuffer, img, nil); err == nil {
 						if torrentImage, err = ioutil.ReadAll(&imgBuffer); err == nil {
@@ -295,5 +299,5 @@ func (cr *Observer) notify(torrent *Torrent, context string, torrentId int64, is
 	torrent.Meta = meta
 	torrent.Image = torrentImage
 	torrent.URL = cr.Crawler.BaseURL + context
-	//cr.announce(isNew, torrent)
+	cr.announce(isNew, torrent)
 }
