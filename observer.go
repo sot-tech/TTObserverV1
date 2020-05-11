@@ -54,15 +54,15 @@ type Observer struct {
 		Level string `json:"level"`
 	} `json:"log"`
 	Crawler struct {
-		BaseURL         string                      `json:"baseurl"`
-		ContextURL      string                      `json:"contexturl"`
-		Delay           uint                        `json:"delay"`
-		Threshold       uint                        `json:"threshold"`
-		Anniversary     uint                        `json:"anniversary"`
-		MetaActions     []HTExtractor.ExtractAction `json:"metaactions"`
-		ImageMetaField  string                      `json:"imagemetafield"`
-		ImageThumb      uint                        `json:"imagethumb"`
-		MetaExtractor   *HTExtractor.Extractor      `json:"-"`
+		BaseURL        string                      `json:"baseurl"`
+		ContextURL     string                      `json:"contexturl"`
+		Delay          uint                        `json:"delay"`
+		Threshold      uint                        `json:"threshold"`
+		Anniversary    uint                        `json:"anniversary"`
+		MetaActions    []HTExtractor.ExtractAction `json:"metaactions"`
+		ImageMetaField string                      `json:"imagemetafield"`
+		ImageThumb     uint                        `json:"imagethumb"`
+		MetaExtractor  *HTExtractor.Extractor      `json:"-"`
 	} `json:"crawler"`
 	Telegram struct {
 		ApiId     int32        `json:"apiid"`
@@ -229,36 +229,32 @@ func (cr *Observer) notify(torrent *Torrent, context string, torrentId int64, is
 	var meta map[string]string
 	var torrentImageUrl string
 	if cr.Crawler.MetaExtractor != nil {
-		//for i := 47; i > 0; i-- {
-		//	logger.Infof("Searching %s in page %d", torrent.Info.Name, i)
-			var rawMeta map[string][]byte
-			//if rawMeta, err = cr.Crawler.MetaExtractor.ExtractData(cr.Crawler.BaseURL + fmt.Sprintf("/anime/catalog/?PAGEN_1=%d", i), context);
-			if rawMeta, err = cr.Crawler.MetaExtractor.ExtractData(cr.Crawler.BaseURL, context);
+		var rawMeta map[string][]byte
+		if rawMeta, err = cr.Crawler.MetaExtractor.ExtractData(cr.Crawler.BaseURL, context);
 			err == nil && len(rawMeta) > 0 {
-			//	for k, v := range rawMeta{
-			//		logger.Info(k, "", string(v))
-			//	}
-				//if len(rawMeta) > 1 {
-					meta = make(map[string]string, len(rawMeta))
-					for k, v := range rawMeta {
-						if len(k) > 0 {
-							s := strings.TrimSpace(html.UnescapeString(string(v)))
-							meta[k] = s
-							if k == cr.Crawler.ImageMetaField {
-								torrentImageUrl = s
-							}
-						}
+			meta = make(map[string]string, len(rawMeta))
+			for k, v := range rawMeta {
+				if len(k) > 0 {
+					s := strings.TrimSpace(html.UnescapeString(string(v)))
+					meta[k] = s
+					if k == cr.Crawler.ImageMetaField {
+						torrentImageUrl = s
 					}
-				//	break
-				//}
+				}
 			}
-		//}
+		}
 	}
 	if err != nil {
 		logger.Error(err)
 	}
-	if err = cr.DB.AddTorrentMeta(torrentId, meta); err != nil {
-		logger.Error(err)
+	if len(meta) > 0 {
+		if err = cr.DB.AddTorrentMeta(torrentId, meta); err != nil {
+			logger.Error(err)
+		}
+	} else {
+		if meta, err = cr.DB.GetTorrentMeta(torrentId); err != nil {
+			logger.Error(err)
+		}
 	}
 	var torrentImage []byte
 	if torrentImage, err = cr.DB.GetTorrentImage(torrentId); err == nil {
