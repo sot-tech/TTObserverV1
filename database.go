@@ -52,13 +52,15 @@ const (
 	existAdmin   = "SELECT 1 FROM TT_ADMIN WHERE ID = $1"
 
 	selectTorrentId       = "SELECT ID FROM TT_TORRENT WHERE NAME = $1"
+	selectTorrents        = "SELECT ID, NAME FROM TT_TORRENT WHERE NAME LIKE $1"
+	existTorrent          = "SELECT 1 FROM TT_TORRENT WHERE ID = $1"
 	insertOrUpdateTorrent = "INSERT INTO TT_TORRENT(NAME) VALUES ($1) ON CONFLICT(NAME) DO NOTHING"
 
 	selectTorrentMeta = "SELECT NAME, VALUE FROM TT_TORRENT_META WHERE TORRENT = $1"
 	insertTorrentMeta = "INSERT INTO TT_TORRENT_META(TORRENT, NAME, VALUE) VALUES($1, $2, $3) ON CONFLICT(TORRENT,NAME) DO UPDATE SET VALUE = EXCLUDED.VALUE"
 
-	selectTorrentFile          = "SELECT ID, TORRENT, NAME FROM TT_TORRENT_FILE WHERE ID = $1"
-	insertTorrentFile          = "INSERT INTO TT_TORRENT_FILE(TORRENT, NAME) VALUES ($1, $2) ON CONFLICT (TORRENT,NAME) DO NOTHING"
+	selectTorrentFile = "SELECT ID, TORRENT, NAME FROM TT_TORRENT_FILE WHERE ID = $1"
+	insertTorrentFile = "INSERT INTO TT_TORRENT_FILE(TORRENT, NAME) VALUES ($1, $2) ON CONFLICT (TORRENT,NAME) DO NOTHING"
 
 	selectTorrentImage = "SELECT IMAGE FROM TT_TORRENT_IMAGE WHERE TORRENT = $1"
 	insertTorrentImage = "INSERT INTO TT_TORRENT_IMAGE(TORRENT,IMAGE) VALUES($1,$2) ON CONFLICT(TORRENT) DO UPDATE SET IMAGE = EXCLUDED.IMAGE"
@@ -68,7 +70,6 @@ const (
 
 	confCrawlOffset = "CRAWL_OFFSET"
 	confTgOffset    = "TG_OFFSET"
-
 )
 
 func (db *Database) checkConnection() error {
@@ -171,6 +172,10 @@ func (db *Database) DelAdmin(id int64) error {
 
 const invalidId = -1
 
+func(db *Database) CheckTorrent(id int64) (bool, error){
+	return db.getNotEmpty(existTorrent, id)
+}
+
 func (db *Database) GetTorrent(torrent string) (int64, error) {
 	var torrentId int64
 	var err error
@@ -188,6 +193,36 @@ func (db *Database) GetTorrent(torrent string) (int64, error) {
 	return torrentId, err
 }
 
+type DBTorrent struct {
+	Id   int64
+	Name string
+}
+
+func (tr *DBTorrent) String() string {
+	if tr == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("Id: %d;\tName: %s", tr.Id, tr.Name)
+}
+
+func (db *Database) GetTorrents(pattern string) ([]DBTorrent, error) {
+	torrents := make([]DBTorrent, 0)
+	var err error
+	if err = db.checkConnection(); err == nil {
+		var rows *sql.Rows
+		rows, err = db.Connection.Query(selectTorrents, pattern)
+		if err == nil && rows != nil {
+			defer rows.Close()
+			for rows.Next() {
+				torrent := DBTorrent{}
+				err = rows.Scan(&torrent.Id, &torrent.Name)
+				torrents = append(torrents, torrent)
+			}
+		}
+	}
+	return torrents, err
+}
+
 func (db *Database) AddTorrent(name string, files []string) (int64, error) {
 	var err error
 	var id int64
@@ -201,22 +236,22 @@ func (db *Database) AddTorrent(name string, files []string) (int64, error) {
 	return id, err
 }
 
-type TorrentFile struct {
+type DBTorrentFile struct {
 	Id      int64
 	Torrent int64
 	Name    string
 }
 
-func (tr *TorrentFile) String() string {
+func (tr *DBTorrentFile) String() string {
 	if tr == nil {
 		return "nil"
 	}
 	return fmt.Sprintf("Id: %d;\tName: %s", tr.Id, tr.Name)
 }
 
-func (db *Database) GetTorrentFile(id int64) (TorrentFile, error) {
+func (db *Database) GetTorrentFile(id int64) (DBTorrentFile, error) {
 	var err error
-	var file TorrentFile
+	var file DBTorrentFile
 	err = db.checkConnection()
 	if err == nil {
 		var rows *sql.Rows

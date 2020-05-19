@@ -162,33 +162,6 @@ func (cr *Observer) Engage() {
 	}
 }
 
-func (cr *Observer) PureEngage() {
-	defer cr.DB.Close()
-	defer cr.Telegram.Client.Close()
-	var err error
-	var nextOffset uint = 457
-	go cr.Telegram.Client.HandleUpdates()
-	for {
-		newNextOffset := nextOffset
-		for offsetToCheck := nextOffset; offsetToCheck < nextOffset+cr.Crawler.Threshold; offsetToCheck++ {
-			if cr.checkTorrent(offsetToCheck) {
-				newNextOffset = offsetToCheck + 1
-			}
-		}
-		if newNextOffset > nextOffset {
-			nextOffset = newNextOffset
-			if err = cr.DB.UpdateCrawlOffset(nextOffset); err != nil {
-				logger.Error(err)
-			}
-		} else {
-			break
-		}
-		sleepTime := time.Duration(rand.Intn(int(cr.Crawler.Delay)) + int(cr.Crawler.Delay))
-		logger.Debugf("Sleeping %d sec", sleepTime)
-		time.Sleep(sleepTime * time.Second)
-	}
-}
-
 func (cr *Observer) checkTorrent(offset uint) bool {
 	var res bool
 	logger.Debug("Checking offset ", offset)
@@ -258,35 +231,8 @@ func (cr *Observer) notify(torrent *Torrent, context string, torrentId int64, is
 	}
 	var torrentImage []byte
 	if torrentImage, err = cr.DB.GetTorrentImage(torrentId); err == nil {
-		if len(torrentImage) == 0 && len(torrentImageUrl) > 0 {
-			if strings.Index(torrentImageUrl, cr.Crawler.BaseURL) < 0 {
-				torrentImageUrl = cr.Crawler.BaseURL + torrentImageUrl
-			}
-			if resp, httpErr := http.Get(torrentImageUrl); httpErr == nil && resp != nil && resp.StatusCode < 400 {
-				defer resp.Body.Close()
-				var img image.Image
-				if img, _, err = image.Decode(resp.Body); err == nil && img != nil {
-					if cr.Crawler.ImageThumb > 0 {
-						img = resize.Thumbnail(cr.Crawler.ImageThumb, cr.Crawler.ImageThumb, img, resize.Bicubic)
-					}
-					imgBuffer := bytes.Buffer{}
-					if err = jpeg.Encode(&imgBuffer, img, nil); err == nil {
-						if torrentImage, err = ioutil.ReadAll(&imgBuffer); err == nil {
-							err = cr.DB.AddTorrentImage(torrentId, torrentImage)
-						}
-					}
-				}
-			} else {
-				errMsg := "crawling: "
-				if httpErr != nil {
-					errMsg += httpErr.Error()
-				} else if resp == nil {
-					errMsg += "empty response"
-				} else {
-					errMsg += resp.Status
-				}
-				err = errors.New(errMsg)
-			}
+		if len(torrentImage) == 0 {
+			err = cr.updateImage(torrentId, torrentImageUrl)
 		}
 	}
 	if err != nil {
@@ -296,4 +242,42 @@ func (cr *Observer) notify(torrent *Torrent, context string, torrentId int64, is
 	torrent.Image = torrentImage
 	torrent.URL = cr.Crawler.BaseURL + context
 	cr.announce(isNew, torrent)
+}
+
+func(cr *Observer) updateImage(torrentId int64, imageUrl string) error {
+	var err error
+	if len(imageUrl) > 0 {
+		if strings.Index(imageUrl, cr.Crawler.BaseURL) < 0 {
+			imageUrl = cr.Crawler.BaseURL + imageUrl
+		}
+		if resp, httpErr := http.Get(imageUrl); httpErr == nil && resp != nil && resp.StatusCode < 400 {
+			defer resp.Body.Close()
+			var img image.Image
+			if img, _, err = image.Decode(resp.Body); err == nil && img != nil {
+				if cr.Crawler.ImageThumb > 0 {
+					img = resize.Thumbnail(cr.Crawler.ImageThumb, cr.Crawler.ImageThumb, img, resize.Bicubic)
+				}
+				imgBuffer := bytes.Buffer{}
+				if err = jpeg.Encode(&imgBuffer, img, nil); err == nil {
+					var torrentImage []byte
+					if torrentImage, err = ioutil.ReadAll(&imgBuffer); err == nil {
+						err = cr.DB.AddTorrentImage(torrentId, torrentImage)
+					}
+				}
+			}
+		} else {
+			errMsg := "crawling: "
+			if httpErr != nil {
+				errMsg += httpErr.Error()
+			} else if resp == nil {
+				errMsg += "empty response"
+			} else {
+				errMsg += resp.Status
+			}
+			err = errors.New(errMsg)
+		}
+	} else{
+		err = errors.New("invalid image url")
+	}
+	return err
 }

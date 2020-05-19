@@ -49,9 +49,10 @@ const (
 	msgFileCount = "filecount"
 	msgMeta      = "meta"
 
-	cmdLsAdmins = "/lsadmins"
-	cmdLsChats  = "/lschats"
-
+	cmdLsAdmins     = "/lsadmins"
+	cmdLsChats      = "/lschats"
+	cmdLsReleases   = "/lsreleases"
+	cmdUpdatePoster = "/uploadposter"
 )
 
 func formatMessage(tmpl *template.Template, values map[string]interface{}) (string, error) {
@@ -93,15 +94,13 @@ func (cr *Observer) getChats(chat int64, admins bool) error {
 			resp = sb.String()
 		} else {
 			logger.Warningf("LsChats: %v", err)
-			resp = cr.Messages.Error + err.Error()
 		}
 	} else {
 		if err == nil {
 			logger.Infof("LsChats unauthorized %d", chat)
-			resp = cr.Messages.Unauthorized
+			err = errors.New(cr.Messages.Unauthorized)
 		} else {
 			logger.Warningf("LsChats: %v", err)
-			resp = cr.Messages.Error + err.Error()
 		}
 	}
 	if err == nil {
@@ -130,6 +129,63 @@ func (cr *Observer) getState(chat int64) (string, error) {
 	})
 }
 
+func (cr *Observer) getReleases(chat int64, args string) error {
+	var err error
+	var isAdmin bool
+	if isAdmin, err = cr.DB.GetAdminExist(chat); isAdmin {
+		var values strings.Builder
+		var torrents []DBTorrent
+		if torrents, err = cr.DB.GetTorrents(args); err == nil {
+			if len(torrents) > 0 {
+				for _, torrent := range torrents {
+					values.WriteString(torrent.String())
+					values.WriteRune('\n')
+				}
+				cr.Telegram.Client.SendMsg(values.String(), []int64{chat}, false)
+			} else {
+				err = errors.New("not found")
+			}
+		}
+	} else {
+		if err == nil {
+			logger.Infof("LsReleases unauthorized %d", chat)
+			err = errors.New(cr.Messages.Unauthorized)
+		} else {
+			logger.Warningf("LsReleases: %v", err)
+		}
+	}
+	return err
+}
+
+func (cr *Observer) uploadPoster(chat int64, args string) error {
+	var err error
+	var isAdmin bool
+	if isAdmin, err = cr.DB.GetAdminExist(chat); isAdmin {
+		var torrentId int64
+		var posterUrl string
+		if _, err = fmt.Sscanf(args,"%d %s", &torrentId, &posterUrl); err == nil {
+			var exist bool
+			if exist, err = cr.DB.CheckTorrent(torrentId); err == nil{
+				if exist {
+					if err = cr.updateImage(torrentId, posterUrl); err == nil{
+						cr.Telegram.Client.SendMsg(cr.Messages.Added, []int64{chat}, false)
+					}
+				} else{
+					err = errors.New("not found")
+				}
+			}
+		}
+	} else {
+		if err == nil {
+			logger.Infof("LsReleases unauthorized %d", chat)
+			err = errors.New(cr.Messages.Unauthorized)
+		} else {
+			logger.Warningf("LsReleases: %v", err)
+		}
+	}
+	return err
+}
+
 func (cr *Observer) initTg() error {
 	var err error
 	telegram := tg.New(cr.Telegram.ApiId, cr.Telegram.ApiHash, cr.Telegram.DBPath, cr.Telegram.FileStore, cr.Telegram.OTPSeed)
@@ -152,6 +208,12 @@ func (cr *Observer) initTg() error {
 		})
 		_ = cr.Telegram.Client.AddCommand(cmdLsAdmins, func(chat int64, _, _ string) error {
 			return cr.getChats(chat, true)
+		})
+		_ = cr.Telegram.Client.AddCommand(cmdLsReleases, func(chat int64, _, args string) error {
+			return cr.getReleases(chat, args)
+		})
+		_ = cr.Telegram.Client.AddCommand(cmdUpdatePoster, func(chat int64, _, args string) error {
+			return cr.uploadPoster(chat, args)
 		})
 	}
 	return err
