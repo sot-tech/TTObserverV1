@@ -177,10 +177,10 @@ func (cr *Observer) uploadPoster(chat int64, args string) error {
 		}
 	} else {
 		if err == nil {
-			logger.Infof("LsReleases unauthorized %d", chat)
+			logger.Infof("UploadPoster unauthorized %d", chat)
 			err = errors.New(cr.Messages.Unauthorized)
 		} else {
-			logger.Warningf("LsReleases: %v", err)
+			logger.Warningf("UploadPoster: %v", err)
 		}
 	}
 	return err
