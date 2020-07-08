@@ -76,11 +76,11 @@ type Observer struct {
 	Messages struct {
 		tg.TGMessages
 		State        string            `json:"state"`
-		stateTmpl    *tmpl.Template    `json:"-"`
+		stateTmpl    *tmpl.Template
 		Announce     string            `json:"announce"`
-		announceTmpl *tmpl.Template    `json:"-"`
+		announceTmpl *tmpl.Template
 		Nx           string            `json:"n1x"`
-		nxTmpl       *tmpl.Template    `json:"-"`
+		nxTmpl       *tmpl.Template
 		Replacements map[string]string `json:"replacements"`
 		Added        string            `json:"added"`
 		Updated      string            `json:"updated"`
@@ -232,7 +232,7 @@ func (cr *Observer) notify(torrent *Torrent, context string, torrentId int64, is
 	var torrentImage []byte
 	if torrentImage, err = cr.DB.GetTorrentImage(torrentId); err == nil {
 		if len(torrentImage) == 0 {
-			err = cr.updateImage(torrentId, torrentImageUrl)
+			err, torrentImage = cr.updateImage(torrentId, torrentImageUrl)
 		}
 	}
 	if err != nil {
@@ -244,8 +244,9 @@ func (cr *Observer) notify(torrent *Torrent, context string, torrentId int64, is
 	cr.announce(isNew, torrent)
 }
 
-func(cr *Observer) updateImage(torrentId int64, imageUrl string) error {
+func(cr *Observer) updateImage(torrentId int64, imageUrl string) (error,[]byte) {
 	var err error
+	var torrentImage []byte
 	if len(imageUrl) > 0 {
 		if strings.Index(imageUrl, cr.Crawler.BaseURL) < 0 {
 			imageUrl = cr.Crawler.BaseURL + imageUrl
@@ -259,7 +260,6 @@ func(cr *Observer) updateImage(torrentId int64, imageUrl string) error {
 				}
 				imgBuffer := bytes.Buffer{}
 				if err = jpeg.Encode(&imgBuffer, img, nil); err == nil {
-					var torrentImage []byte
 					if torrentImage, err = ioutil.ReadAll(&imgBuffer); err == nil {
 						err = cr.DB.AddTorrentImage(torrentId, torrentImage)
 					}
@@ -279,5 +279,5 @@ func(cr *Observer) updateImage(torrentId int64, imageUrl string) error {
 	} else{
 		err = errors.New("invalid image url")
 	}
-	return err
+	return err, torrentImage
 }

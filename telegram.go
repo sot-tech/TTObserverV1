@@ -167,7 +167,7 @@ func (cr *Observer) uploadPoster(chat int64, args string) error {
 			var exist bool
 			if exist, err = cr.DB.CheckTorrent(torrentId); err == nil{
 				if exist {
-					if err = cr.updateImage(torrentId, posterUrl); err == nil{
+					if err, _ = cr.updateImage(torrentId, posterUrl); err == nil{
 						cr.Telegram.Client.SendMsg(cr.Messages.Added, []int64{chat}, false)
 					}
 				} else{
