@@ -199,17 +199,17 @@ func (cr *Observer) checkTorrent(offset uint) bool {
 
 func (cr *Observer) notify(torrent *Torrent, context string, torrentId int64, isNew bool) {
 	var err error
-	var meta map[string]string
+	var upstreamMeta, existingMeta map[string]string
 	var torrentImageUrl string
 	if cr.Crawler.MetaExtractor != nil {
 		var rawMeta map[string][]byte
 		if rawMeta, err = cr.Crawler.MetaExtractor.ExtractData(cr.Crawler.BaseURL, context);
 			err == nil && len(rawMeta) > 0 {
-			meta = make(map[string]string, len(rawMeta))
+			upstreamMeta = make(map[string]string, len(rawMeta))
 			for k, v := range rawMeta {
 				if len(k) > 0 {
 					s := strings.TrimSpace(html.UnescapeString(string(v)))
-					meta[k] = s
+					upstreamMeta[k] = s
 					if k == cr.Crawler.ImageMetaField {
 						torrentImageUrl = s
 					}
@@ -220,25 +220,27 @@ func (cr *Observer) notify(torrent *Torrent, context string, torrentId int64, is
 	if err != nil {
 		logger.Error(err)
 	}
-	if len(meta) > 0 {
-		if err = cr.DB.AddTorrentMeta(torrentId, meta); err != nil {
+	if existingMeta, err = cr.DB.GetTorrentMeta(torrentId); err != nil {
+		logger.Error(err)
+		existingMeta = make(map[string]string)
+	}
+	if len(upstreamMeta) > 0 {
+		if err = cr.DB.AddTorrentMeta(torrentId, upstreamMeta); err != nil {
 			logger.Error(err)
 		}
 	} else {
-		if meta, err = cr.DB.GetTorrentMeta(torrentId); err != nil {
-			logger.Error(err)
-		}
+		upstreamMeta = existingMeta
 	}
 	var torrentImage []byte
 	if torrentImage, err = cr.DB.GetTorrentImage(torrentId); err == nil {
-		if len(torrentImage) == 0 {
+		if len(torrentImage) == 0 || existingMeta[cr.Crawler.ImageMetaField] != torrentImageUrl {
 			err, torrentImage = cr.updateImage(torrentId, torrentImageUrl)
 		}
 	}
 	if err != nil {
 		logger.Error(err)
 	}
-	torrent.Meta = meta
+	torrent.Meta = upstreamMeta
 	torrent.Image = torrentImage
 	torrent.URL = cr.Crawler.BaseURL + context
 	cr.announce(isNew, torrent)
