@@ -59,8 +59,10 @@ const (
 	selectTorrentMeta = "SELECT NAME, VALUE FROM TT_TORRENT_META WHERE TORRENT = $1"
 	insertTorrentMeta = "INSERT INTO TT_TORRENT_META(TORRENT, NAME, VALUE) VALUES($1, $2, $3) ON CONFLICT(TORRENT,NAME) DO UPDATE SET VALUE = EXCLUDED.VALUE"
 
-	selectTorrentFile = "SELECT ID, TORRENT, NAME FROM TT_TORRENT_FILE WHERE ID = $1"
-	insertTorrentFile = "INSERT INTO TT_TORRENT_FILE(TORRENT, NAME) VALUES ($1, $2) ON CONFLICT (TORRENT,NAME) DO NOTHING"
+	selectTorrentFiles = "SELECT ID, TORRENT, NAME FROM TT_TORRENT_FILE"
+	selectTorrentFileById       = selectTorrentFiles + " WHERE ID = $1"
+	selectTorrentFilesByTorrent = selectTorrentFiles + " WHERE TORRENT = $1"
+	insertTorrentFile           = "INSERT INTO TT_TORRENT_FILE(TORRENT, NAME) VALUES ($1, $2) ON CONFLICT (TORRENT,NAME) DO NOTHING"
 
 	selectTorrentImage = "SELECT IMAGE FROM TT_TORRENT_IMAGE WHERE TORRENT = $1"
 	insertTorrentImage = "INSERT INTO TT_TORRENT_IMAGE(TORRENT,IMAGE) VALUES($1,$2) ON CONFLICT(TORRENT) DO UPDATE SET IMAGE = EXCLUDED.IMAGE"
@@ -249,21 +251,43 @@ func (tr *DBTorrentFile) String() string {
 	return fmt.Sprintf("Id: %d;\tName: %s", tr.Id, tr.Name)
 }
 
-func (db *Database) GetTorrentFile(id int64) (DBTorrentFile, error) {
+func (db *Database) getTorrentFilesQuery(query string, args ...interface{}) ([]DBTorrentFile, error) {
 	var err error
-	var file DBTorrentFile
+	var files []DBTorrentFile
 	err = db.checkConnection()
 	if err == nil {
 		var rows *sql.Rows
-		rows, err = db.Connection.Query(selectTorrentFile, id)
+		rows, err = db.Connection.Query(query, args...)
 		if err == nil && rows != nil {
 			defer rows.Close()
-			if rows.Next() {
-				err = rows.Scan(&file.Id, &file.Torrent, &file.Name)
+			for rows.Next() {
+				file := DBTorrentFile{}
+				if err = rows.Scan(&file.Id, &file.Torrent, &file.Name); err == nil {
+					files = append(files, file)
+				} else {
+					files = []DBTorrentFile{}
+					break
+				}
 			}
 		}
 	}
+	return files, err
+}
+
+func (db *Database) GetTorrentFile(id int64) (DBTorrentFile, error) {
+	var err error
+	var file = DBTorrentFile{
+		Id: invalidId,
+	}
+	var files []DBTorrentFile
+	if files, err = db.getTorrentFilesQuery(selectTorrentFileById, id); err == nil && len(files) > 0 {
+		file = files[0]
+	}
 	return file, err
+}
+
+func (db *Database) GetTorrentFiles(torrent int64) ([]DBTorrentFile, error){
+	return db.getTorrentFilesQuery(selectTorrentFilesByTorrent, torrent)
 }
 
 func (db *Database) getConfigValue(name string) (string, error) {

@@ -28,11 +28,30 @@ package TTObserver
 
 import (
 	"errors"
-	"fmt"
 	"github.com/zeebo/bencode"
 	"net/http"
 	"path/filepath"
 )
+
+type TorrentInfo struct {
+	Id     int64
+	Name   string
+	URL    string
+	Image  []byte
+	Meta   map[string]string
+	Files  map[string]bool
+	Length uint64
+}
+
+func (t TorrentInfo) NewFiles() []string {
+	var res []string
+	for file, isNew := range t.Files {
+		if isNew {
+			res = append(res, file)
+		}
+	}
+	return res
+}
 
 type Torrent struct {
 	AnnounceList [][]string `bencode:"announce-list"`
@@ -53,21 +72,34 @@ type Torrent struct {
 		PieceLength uint64 `bencode:"piece length"`
 		Pieces      []byte `bencode:"pieces"`
 	} `bencode:"info"`
-	URL   string            `bencode:"-"`
-	Image []byte            `bencode:"-"`
-	Meta  map[string]string `bencode:"-"`
 }
 
-func GetTorrent(url string) (*Torrent, error) {
-	var res *Torrent
+func GetTorrent(url string) (*TorrentInfo, error) {
+	var res *TorrentInfo
 	var err error
 	if resp, httpErr := http.Get(url); httpErr == nil && resp != nil && resp.StatusCode < 400 {
 		defer resp.Body.Close()
 		var torrent Torrent
 		err := bencode.NewDecoder(resp.Body).Decode(&torrent)
 		if err == nil {
-			torrent.URL = torrent.PublisherUrl
-			res = &torrent
+			res = &TorrentInfo{
+				Name:  torrent.Info.Name,
+				URL:   torrent.PublisherUrl,
+				Files: make(map[string]bool),
+			}
+			if torrent.Info.Files != nil {
+				for _, file := range torrent.Info.Files {
+					if file.Path != nil {
+						allParts := []string{torrent.Info.Name}
+						allParts = append(allParts, file.Path...)
+						res.Files["/"+filepath.Join(allParts...)] = true
+					}
+					res.Length += file.Length
+				}
+			} else {
+				res.Files["/"+torrent.Info.Name] = true
+				res.Length = torrent.Info.Length
+			}
 		}
 	} else {
 		errMsg := "crawling: "
@@ -81,69 +113,4 @@ func GetTorrent(url string) (*Torrent, error) {
 		err = errors.New(errMsg)
 	}
 	return res, err
-}
-
-func (t *Torrent) FullSize() uint64 {
-	var fullLen uint64
-	if t.Info.Length > 0 {
-		fullLen = t.Info.Length
-	} else {
-		if t.Info.Files != nil {
-			for _, file := range t.Info.Files {
-				fullLen += file.Length
-			}
-		}
-	}
-	return fullLen
-}
-
-func (t *Torrent) FileCount() uint64 {
-	var count uint64
-	if t.Info.Files == nil || len(t.Info.Files) == 0 {
-		if t.Info.Length > 0 {
-			count = 1
-		}
-	} else {
-		count = uint64(len(t.Info.Files))
-	}
-	return count
-}
-
-func (t *Torrent) StringSize() string {
-	const base = 1024
-	const suff = "KMGTPEZY"
-	var size uint64
-	size = t.FullSize()
-	var res string
-	if size < base {
-		res = fmt.Sprintf("%d B", size)
-	} else {
-		d, e := uint64(base), 0
-		for n := size / base; n >= base; n /= base {
-			d *= base
-			e++
-		}
-		s := '?'
-		if e < len(suff) {
-			s = rune(suff[e])
-		}
-		res = fmt.Sprintf("%.2f %ciB", float64(size)/float64(d), s)
-	}
-	return res
-}
-
-func (t *Torrent) Files() []string {
-	var files []string
-	if t.Info.Files != nil {
-		for _, file := range t.Info.Files {
-			if file.Path != nil {
-				allParts := []string{t.Info.Name}
-				allParts = append(allParts, file.Path...)
-				files = append(files, "/"+filepath.Join(allParts...))
-			}
-		}
-	} else {
-		files = append(files, "/"+t.Info.Name)
-	}
-	return files
 }
