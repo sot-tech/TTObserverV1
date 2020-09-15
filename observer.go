@@ -27,22 +27,19 @@
 package TTObserver
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/nfnt/resize"
 	"github.com/op/go-logging"
 	"html"
-	"image"
 	_ "image/gif"
-	"image/jpeg"
 	_ "image/png"
 	"io/ioutil"
 	"math/rand"
-	"net/http"
 	"sot-te.ch/HTExtractor"
 	"sot-te.ch/TTObserverV1/notifier"
+	_ "sot-te.ch/TTObserverV1/notifier/tg"
+	s "sot-te.ch/TTObserverV1/shared"
 	"strings"
 	"time"
 )
@@ -63,9 +60,10 @@ type Observer struct {
 		ImageThumb     uint                        `json:"imagethumb"`
 		metaExtractor  *HTExtractor.Extractor
 	} `json:"crawler"`
-	Announcer notifier.Announcer `json:"announcers"`
-	DBFile string `json:"dbfile"`
-	db     *Database
+	Announcers []notifier.Config `json:"announcers"`
+	DBFile     string            `json:"dbfile"`
+	db         *s.Database
+	announcer  notifier.Announcer
 }
 
 var logger = logging.MustGetLogger("observer")
@@ -80,7 +78,7 @@ func ReadConfig(path string) (*Observer, error) {
 }
 
 func (cr *Observer) Init() error {
-	db := &Database{}
+	db := &s.Database{}
 	if err := db.Connect(cr.DBFile); err != nil {
 		return err
 	}
@@ -97,8 +95,8 @@ func (cr *Observer) Init() error {
 		return errors.New("extract actions not set")
 	}
 	var err error
-	if len(cr.Announcer.Notifiers) > 0{
-		err = cr.Announcer.Init(cr, db)
+	if len(cr.Announcers) > 0 {
+		cr.announcer, err = notifier.New(cr.Announcers, db)
 	} else {
 		err = errors.New("notifiers not set")
 	}
@@ -107,7 +105,7 @@ func (cr *Observer) Init() error {
 
 func (cr *Observer) Engage() {
 	defer cr.db.Close()
-	defer cr.Announcer.Close()
+	defer cr.announcer.Close()
 	var err error
 	var nextOffset uint
 	if nextOffset, err = cr.db.GetCrawlOffset(); err == nil {
@@ -137,7 +135,7 @@ func (cr *Observer) CheckTorrent(offset uint) bool {
 	var res bool
 	logger.Debug("Checking offset ", offset)
 	fullContext := fmt.Sprintf(cr.Crawler.ContextURL, offset)
-	if torrent, err := GetTorrent(cr.Crawler.BaseURL + fullContext); err == nil {
+	if torrent, err := s.GetTorrent(cr.Crawler.BaseURL + fullContext); err == nil {
 		if torrent != nil {
 			logger.Info("New file", torrent.Name)
 			newSize := torrent.Length
@@ -146,7 +144,7 @@ func (cr *Observer) CheckTorrent(offset uint) bool {
 				var torrentId int64
 				var isNew bool
 				if torrentId, err = cr.db.GetTorrent(torrent.Name); err == nil {
-					var existFiles []DBTorrentFile
+					var existFiles []s.DBTorrentFile
 					if existFiles, err = cr.db.GetTorrentFiles(torrentId); err == nil {
 						if len(existFiles) > 0 {
 							for _, file := range existFiles {
@@ -161,14 +159,14 @@ func (cr *Observer) CheckTorrent(offset uint) bool {
 				} else {
 					logger.Error(err)
 				}
-				isNew = torrentId == invalidId
+				isNew = torrentId == s.InvalidDBId
 				if torrentId, err = cr.db.AddTorrent(torrent.Name, torrent.NewFiles()); err != nil {
 					logger.Error(err)
 				}
 				torrent.Id = torrentId
 				cr.Notify(*torrent, fullContext, isNew)
 				if offset > 0 && offset%cr.Crawler.Anniversary == 0 {
-					cr.Announcer.NxGet(offset)
+					cr.announcer.NxGet(offset)
 				}
 
 				res = true
@@ -182,7 +180,7 @@ func (cr *Observer) CheckTorrent(offset uint) bool {
 	return res
 }
 
-func (cr *Observer) Notify(torrent TorrentInfo, context string, isNew bool) {
+func (cr *Observer) Notify(torrent s.TorrentInfo, context string, isNew bool) {
 	var err error
 	var upstreamMeta, existingMeta map[string]string
 	var torrentImageUrl string
@@ -193,10 +191,10 @@ func (cr *Observer) Notify(torrent TorrentInfo, context string, isNew bool) {
 			upstreamMeta = make(map[string]string, len(rawMeta))
 			for k, v := range rawMeta {
 				if len(k) > 0 {
-					s := strings.TrimSpace(html.UnescapeString(string(v)))
-					upstreamMeta[k] = s
+					unescapedValue := strings.TrimSpace(html.UnescapeString(string(v)))
+					upstreamMeta[k] = unescapedValue
 					if k == cr.Crawler.ImageMetaField {
-						torrentImageUrl = s
+						torrentImageUrl = unescapedValue
 					}
 				}
 			}
@@ -219,7 +217,14 @@ func (cr *Observer) Notify(torrent TorrentInfo, context string, isNew bool) {
 	var torrentImage []byte
 	if torrentImage, err = cr.db.GetTorrentImage(torrent.Id); err == nil {
 		if len(torrentImage) == 0 || existingMeta[cr.Crawler.ImageMetaField] != torrentImageUrl {
-			err, torrentImage = cr.UpdateImage(torrent.Id, torrentImageUrl)
+			if len(torrentImageUrl) > 0 {
+				if strings.Index(torrentImageUrl, cr.Crawler.BaseURL) < 0 {
+					torrentImageUrl = cr.Crawler.BaseURL + torrentImageUrl
+				}
+				if err, torrentImage = s.GetTorrentPoster(torrentImageUrl, cr.Crawler.ImageThumb); err == nil{
+					err = cr.db.AddTorrentImage(torrent.Id, torrentImage)
+				}
+			}
 		}
 	}
 	if err != nil {
@@ -228,43 +233,6 @@ func (cr *Observer) Notify(torrent TorrentInfo, context string, isNew bool) {
 	torrent.Meta = upstreamMeta
 	torrent.Image = torrentImage
 	torrent.URL = cr.Crawler.BaseURL + context
-	cr.Announcer.Notify(isNew, torrent)
+	cr.announcer.Notify(isNew, torrent)
 }
 
-func (cr *Observer) UpdateImage(torrentId int64, imageUrl string) (error, []byte) {
-	var err error
-	var torrentImage []byte
-	if len(imageUrl) > 0 {
-		if strings.Index(imageUrl, cr.Crawler.BaseURL) < 0 {
-			imageUrl = cr.Crawler.BaseURL + imageUrl
-		}
-		if resp, httpErr := http.Get(imageUrl); httpErr == nil && resp != nil && resp.StatusCode < 400 {
-			defer resp.Body.Close()
-			var img image.Image
-			if img, _, err = image.Decode(resp.Body); err == nil && img != nil {
-				if cr.Crawler.ImageThumb > 0 {
-					img = resize.Thumbnail(cr.Crawler.ImageThumb, cr.Crawler.ImageThumb, img, resize.Bicubic)
-				}
-				imgBuffer := bytes.Buffer{}
-				if err = jpeg.Encode(&imgBuffer, img, nil); err == nil {
-					if torrentImage, err = ioutil.ReadAll(&imgBuffer); err == nil {
-						err = cr.db.AddTorrentImage(torrentId, torrentImage)
-					}
-				}
-			}
-		} else {
-			errMsg := "crawling: "
-			if httpErr != nil {
-				errMsg += httpErr.Error()
-			} else if resp == nil {
-				errMsg += "empty response"
-			} else {
-				errMsg += resp.Status
-			}
-			err = errors.New(errMsg)
-		}
-	} else {
-		err = errors.New("invalid image url")
-	}
-	return err, torrentImage
-}

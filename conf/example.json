@@ -42,33 +42,11 @@
 		"imagemetafield": "poster",
 		"imagethumb": 1280
 	},
-	"telegram": {
-		"apiid": 123456,
-		"apihash":"kqwrvonebe34283on3on",
-		"bottoken": "123321:BOIBGvOUVUYVYBGIoiboiubib",
-		"dbpath": "/var/lib/tto/tgdb",
-		"filestorepath": "/tmp/tgf",
-		"otpseed": "SOMERANDOMBASE32LONGSTRING"
-	},
-	"msg": {
-		"announce": "**Torrent {{.action}}**\nName: `{{.meta.name_en}} (File name: {{.name}})`\nSize: `{{.size}}`\nFile count: `{{.filecount}}`\n[Download📥]({{.url}})\n",
-		"n1x": "Anniversary release🤘: {{.index}}",
-		"added": "Added",
-		"updated": "Updated",
-		"error": "Error: ",
-		"auth": "Unauthorized",
-		"state": "Observer: {{.watch}}\nAdmin: {{.admin}}\nNext index: {{.index}}",
-		"replacements": {
-			"_": " "
-		},
-		"cmds": {
-			"start": "Commands:\n/start\n/attach\n/detach\n/state\n/setadmin\n/rmadmin\n/lschats\n/lsadmins",
-			"attach": "Subscribed",
-			"detach": "Unsubscribed",
-			"setadmin": "Access granted",
-			"rmadmin": "Access revoked",
-			"unknown": "Unknown command"
+	"announcers": [
+		{
+			"type": "telegram",
+			"configpath": "conf/example_tg.json"
 		}
-	},
+	],
 	"dbfile": "var/lib/tto/tt.db"
 }

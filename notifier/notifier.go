@@ -30,18 +30,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/op/go-logging"
 	"sort"
-	tto "sot-te.ch/TTObserverV1"
+	tts "sot-te.ch/TTObserverV1/shared"
 	"sync"
 	"text/template"
 )
 
-var logger = logging.MustGetLogger("notifier")
-
 type Notifier interface {
-	New(string, *tto.Observer, *tto.Database) (Notifier, error)
-	Notify(bool, tto.TorrentInfo)
+	New(string, *tts.Database) (Notifier, error)
+	Notify(bool, tts.TorrentInfo)
 	NxGet(uint)
 	Close()
 }
@@ -105,13 +102,13 @@ func GetNewFilesIndexes(files map[string]bool) []int {
 	indexes := make([]int, 0, len(files))
 	if len(files) > 0 {
 		paths := make([]string, 0, len(files))
-		for k, _ := range files {
+		for k := range files {
 			paths = append(paths, k)
 		}
 		sort.Strings(paths)
-		for i, path := range paths{
+		for i, path := range paths {
 			if files[path] {
-				indexes = append(indexes, i + 1)
+				indexes = append(indexes, i+1)
 			}
 		}
 	}
@@ -119,18 +116,21 @@ func GetNewFilesIndexes(files map[string]bool) []int {
 }
 
 type Announcer struct {
-	Notifiers []Config
 	notifiers []Notifier
+	db        *tts.Database
 }
 
-func (a *Announcer) Init(observer *tto.Observer, db *tto.Database) error {
+func New(Notifiers []Config, db *tts.Database) (Announcer, error) {
 	var err error
-	a.notifiers = make([]Notifier, 0)
-	if len(a.Notifiers) > 0 {
-		for i, n := range a.Notifiers {
+	a := Announcer{
+		notifiers: make([]Notifier, 0),
+		db: db,
+	}
+	if len(Notifiers) > 0 {
+		for i, n := range Notifiers {
 			if ni := notifi[n.Type]; ni != nil {
 				var nn Notifier
-				if nn, err = ni.New(n.ConfigPath, observer, db); err == nil {
+				if nn, err = ni.New(n.ConfigPath, db); err == nil {
 					if nn != nil {
 						a.notifiers = append(a.notifiers, nn)
 					} else {
@@ -145,10 +145,10 @@ func (a *Announcer) Init(observer *tto.Observer, db *tto.Database) error {
 			}
 		}
 	}
-	return err
+	return a, err
 }
 
-func (a Announcer) Notify(new bool, torrent tto.TorrentInfo) {
+func (a Announcer) Notify(new bool, torrent tts.TorrentInfo) {
 	for _, n := range a.notifiers {
 		n.Notify(new, torrent)
 	}
