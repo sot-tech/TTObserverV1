@@ -2,3 +2,4 @@
 /.idea
 /conf/*
 !/conf/example.*
+/cmd/ttobserver
