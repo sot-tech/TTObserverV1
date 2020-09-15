@@ -1,5 +1,5 @@
 /*.log
 /.idea
 /conf/*
-!/conf/example.*
+!/conf/example*.json
 /cmd/ttobserver
