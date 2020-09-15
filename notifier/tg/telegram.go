@@ -88,7 +88,7 @@ type Notifier struct {
 	client   *mt.Telegram
 }
 
-func (tg Notifier) getChats(chat int64, admins bool) error {
+func (tg *Notifier) getChats(chat int64, admins bool) error {
 	var err error
 	var resp string
 	var isAdmin bool
@@ -128,7 +128,7 @@ func (tg Notifier) getChats(chat int64, admins bool) error {
 	return err
 }
 
-func (tg Notifier) getState(chat int64) (string, error) {
+func (tg *Notifier) getState(chat int64) (string, error) {
 	var err error
 	var isMob, isAdmin bool
 	var index uint
@@ -148,7 +148,7 @@ func (tg Notifier) getState(chat int64) (string, error) {
 	})
 }
 
-func (tg Notifier) getReleases(chat int64, args string) error {
+func (tg *Notifier) getReleases(chat int64, args string) error {
 	var err error
 	var isAdmin bool
 	if isAdmin, err = tg.db.GetAdminExist(chat); isAdmin {
@@ -176,7 +176,7 @@ func (tg Notifier) getReleases(chat int64, args string) error {
 	return err
 }
 
-func (tg Notifier) uploadPoster(chat int64, args string) error {
+func (tg *Notifier) uploadPoster(chat int64, args string) error {
 	var err error
 	var isAdmin bool
 	if isAdmin, err = tg.db.GetAdminExist(chat); isAdmin {
@@ -261,7 +261,7 @@ func (tg *Notifier) initTg() error {
 	return err
 }
 
-func (tg Notifier) sendMsgToMobs(msg string, photo []byte) {
+func (tg *Notifier) sendMsgToMobs(msg string, photo []byte) {
 	var chats []int64
 	var err error
 	if chats, err = tg.db.GetChats(); err != nil {
