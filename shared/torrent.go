@@ -36,6 +36,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
+	"strings"
 )
 
 type TorrentInfo struct {
@@ -107,15 +108,7 @@ func GetTorrent(url string) (*TorrentInfo, error) {
 			}
 		}
 	} else {
-		errMsg := "crawling: "
-		if httpErr != nil {
-			errMsg += httpErr.Error()
-		} else if resp == nil {
-			errMsg += "empty response"
-		} else {
-			errMsg += resp.Status
-		}
-		err = errors.New(errMsg)
+		err = buildError(resp, httpErr, "get torrent")
 	}
 	return res, err
 }
@@ -138,18 +131,26 @@ func GetTorrentPoster(imageUrl string, maxSize uint) (error, []byte) {
 				}
 			}
 		} else {
-			errMsg := "crawling: "
-			if httpErr != nil {
-				errMsg += httpErr.Error()
-			} else if resp == nil {
-				errMsg += "empty response"
-			} else {
-				errMsg += resp.Status
-			}
-			err = errors.New(errMsg)
+			err = buildError(resp, httpErr, "get poster")
 		}
 	} else {
 		err = errors.New("invalid image url")
 	}
 	return err, torrentImage
+}
+
+func buildError(resp *http.Response, httpErr error, desc string) error {
+	sb := strings.Builder{}
+	sb.WriteString(desc)
+	if sb.Len() > 0{
+		sb.WriteRune('.')
+	}
+	if httpErr != nil {
+		sb.WriteString(httpErr.Error())
+	} else if resp == nil {
+		sb.WriteString("empty response")
+	} else {
+		sb.WriteString(resp.Status)
+	}
+	return errors.New(sb.String())
 }

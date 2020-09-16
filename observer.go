@@ -95,6 +95,7 @@ func (cr *Observer) Init() error {
 		return errors.New("extract actions not set")
 	}
 	var err error
+	logger.Debug("Initiating notifiers")
 	if len(cr.Announcers) > 0 {
 		cr.announcer, err = notifier.New(cr.Announcers, db)
 	} else {
@@ -186,6 +187,7 @@ func (cr *Observer) Notify(torrent s.TorrentInfo, context string, isNew bool) {
 	var torrentImageUrl string
 	if cr.Crawler.metaExtractor != nil {
 		var rawMeta map[string][]byte
+		logger.Debug("Extracting meta for torrent ", torrent.Name)
 		if rawMeta, err = cr.Crawler.metaExtractor.ExtractData(cr.Crawler.BaseURL, context);
 			err == nil && len(rawMeta) > 0 {
 			upstreamMeta = make(map[string]string, len(rawMeta))
@@ -208,16 +210,19 @@ func (cr *Observer) Notify(torrent s.TorrentInfo, context string, isNew bool) {
 		existingMeta = make(map[string]string)
 	}
 	if len(upstreamMeta) > 0 {
+		logger.Debug("Updating meta")
 		if err = cr.db.AddTorrentMeta(torrent.Id, upstreamMeta); err != nil {
 			logger.Error(err)
 		}
 	} else {
+		logger.Warning("Upstream meta is empty, using cached")
 		upstreamMeta = existingMeta
 	}
 	var torrentImage []byte
 	if torrentImage, err = cr.db.GetTorrentImage(torrent.Id); err == nil {
 		if len(torrentImage) == 0 || existingMeta[cr.Crawler.ImageMetaField] != torrentImageUrl {
 			if len(torrentImageUrl) > 0 {
+				logger.Info("Reloading torrent image")
 				if strings.Index(torrentImageUrl, cr.Crawler.BaseURL) < 0 {
 					torrentImageUrl = cr.Crawler.BaseURL + torrentImageUrl
 				}

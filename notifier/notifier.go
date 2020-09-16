@@ -30,6 +30,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/op/go-logging"
 	"sort"
 	tts "sot-te.ch/TTObserverV1/shared"
 	"sync"
@@ -48,6 +49,7 @@ type Config struct {
 	ConfigPath string `json:"configpath"`
 }
 
+var logger = logging.MustGetLogger("notifier")
 var notifi = make(map[string]Notifier)
 var notifiMu sync.Mutex
 
@@ -59,6 +61,7 @@ func RegisterNotifier(name string, n Notifier) {
 	} else if n == nil {
 		panic("unspecified notifier ref instance")
 	} else {
+		logger.Debug("Registering new notifier ", name)
 		notifi[name] = n
 	}
 }
@@ -130,11 +133,12 @@ func New(Notifiers []Config, db *tts.Database) (Announcer, error) {
 		for i, n := range Notifiers {
 			if ni := notifi[n.Type]; ni != nil {
 				var nn Notifier
+				logger.Debug("Initiating new notifier ", n.Type)
 				if nn, err = ni.New(n.ConfigPath, db); err == nil {
 					if nn != nil {
 						a.notifiers = append(a.notifiers, nn)
 					} else {
-						err = errors.New(fmt.Sprint("unable to construct notifier #", i))
+						err = errors.New(fmt.Sprint("unable to construct notifier #", i, " type: ", n.Type))
 					}
 				}
 			} else {
