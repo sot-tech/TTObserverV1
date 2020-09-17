@@ -46,6 +46,10 @@
 		{
 			"type": "telegram",
 			"configpath": "conf/example_tg.json"
+		},
+		{
+			"type": "vkcom",
+			"configpath": "conf/example_vk.json"
 		}
 	],
 	"dbfile": "var/lib/tto/tt.db"

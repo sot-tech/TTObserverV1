@@ -33,8 +33,21 @@ import (
 	"github.com/op/go-logging"
 	"sort"
 	tts "sot-te.ch/TTObserverV1/shared"
+	"strconv"
+	"strings"
 	"sync"
 	"text/template"
+)
+
+const (
+	MsgAction     = "action"
+	MsgName       = "name"
+	MsgSize       = "size"
+	MsgUrl        = "url"
+	MsgIndex      = "index"
+	MsgFileCount  = "filecount"
+	MsgMeta       = "meta"
+	MsgNewIndexes = "newindexes"
 )
 
 type Notifier interface {
@@ -116,6 +129,32 @@ func GetNewFilesIndexes(files map[string]bool) []int {
 		}
 	}
 	return indexes
+}
+
+func FormatIndexesMessage(files map[string]bool, singleMsgTmpl, mulMsgTmpl *template.Template, placeholder string) (string, error){
+	var err error
+	var msg string
+	if idxs := GetNewFilesIndexes(files); len(idxs) > 0{
+		var tmpl *template.Template
+		if len(idxs) == 1 {
+			tmpl = singleMsgTmpl
+		} else{
+			tmpl = mulMsgTmpl
+		}
+		sb := strings.Builder{}
+		isFirst := true
+		for _, i := range idxs {
+			if !isFirst {
+				sb.WriteString(", ")
+			}
+			isFirst = false
+			sb.WriteString(strconv.Itoa(i))
+		}
+		msg, err = FormatMessage(tmpl, map[string]interface{}{
+			placeholder: sb.String(),
+		})
+	}
+	return msg, err
 }
 
 type Announcer struct {

@@ -42,16 +42,8 @@ import (
 )
 
 const (
-	msgAction    = "action"
-	msgName      = "name"
-	msgSize      = "size"
-	msgUrl       = "url"
-	msgIndex     = "index"
-	msgWatch     = "watch"
-	msgAdmin     = "admin"
-	msgFileCount = "filecount"
-	msgMeta      = "meta"
-	msgNewFiles  = "newFiles"
+	msgWatch = "watch"
+	msgAdmin = "admin"
 
 	cmdLsAdmins     = "/lsadmins"
 	cmdLsChats      = "/lschats"
@@ -74,18 +66,22 @@ type Notifier struct {
 	OTPSeed   string `json:"otpseed"`
 	Messages  struct {
 		mt.TGMessages
-		State        string `json:"state"`
-		stateTmpl    *tmpl.Template
-		Announce     string `json:"announce"`
-		announceTmpl *tmpl.Template
-		Nx           string `json:"n1x"`
-		nxTmpl       *tmpl.Template
-		Replacements map[string]string `json:"replacements"`
-		Added        string            `json:"added"`
-		Updated      string            `json:"updated"`
+		State               string `json:"state"`
+		stateTmpl           *tmpl.Template
+		Announce            string `json:"announce"`
+		announceTmpl        *tmpl.Template
+		Nx                  string `json:"n1x"`
+		nxTmpl              *tmpl.Template
+		Replacements        map[string]string `json:"replacements"`
+		Added               string            `json:"added"`
+		Updated             string            `json:"updated"`
+		SingleIndex         string            `json:"singleindex"`
+		singleIndexTmpl     *tmpl.Template
+		MultipleIndexes     string `json:"multipleindexes"`
+		multipleIndexesTmpl *tmpl.Template
 	} `json:"msg"`
-	db       *s.Database
-	client   *mt.Telegram
+	db     *s.Database
+	client *mt.Telegram
 }
 
 func (tg *Notifier) getChats(chat int64, admins bool) error {
@@ -142,9 +138,9 @@ func (tg *Notifier) getState(chat int64) (string, error) {
 		return "", err
 	}
 	return notifier.FormatMessage(tg.Messages.stateTmpl, map[string]interface{}{
-		msgWatch: isMob,
-		msgAdmin: isAdmin,
-		msgIndex: index,
+		msgWatch:          isMob,
+		msgAdmin:          isAdmin,
+		notifier.MsgIndex: index,
 	})
 }
 
@@ -188,8 +184,8 @@ func (tg *Notifier) uploadPoster(chat int64, args string) error {
 				if exist {
 					if len(posterUrl) > 0 {
 						var torrentPoster []byte
-						if err, torrentPoster = s.GetTorrentPoster(posterUrl, 0); err == nil{
-							if err = tg.db.AddTorrentImage(torrentId, torrentPoster); err == nil{
+						if err, torrentPoster = s.GetTorrentPoster(posterUrl, 0); err == nil {
+							if err = tg.db.AddTorrentImage(torrentId, torrentPoster); err == nil {
 								tg.client.SendMsg(tg.Messages.Added, []int64{chat}, false)
 							}
 						}
@@ -257,6 +253,12 @@ func (tg *Notifier) initTg() error {
 		if tg.Messages.nxTmpl, subErr = tmpl.New("n1000").Parse(tg.Messages.Nx); subErr != nil {
 			logger.Error(subErr)
 		}
+		if tg.Messages.singleIndexTmpl, subErr = tmpl.New("singleIndex").Parse(tg.Messages.SingleIndex); subErr != nil {
+			logger.Error(subErr)
+		}
+		if tg.Messages.multipleIndexesTmpl, subErr = tmpl.New("multipleIndexes").Parse(tg.Messages.MultipleIndexes); subErr != nil {
+			logger.Error(subErr)
+		}
 	}
 	return err
 }
@@ -295,7 +297,7 @@ func (tg *Notifier) sendMsgToMobs(msg string, photo []byte) {
 func (tg Notifier) New(configPath string, db *s.Database) (notifier.Notifier, error) {
 	var err error
 	n := Notifier{
-		db:       db,
+		db: db,
 	}
 	var confBytes []byte
 	if confBytes, err = ioutil.ReadFile(configPath); err == nil {
@@ -323,13 +325,19 @@ func (tg Notifier) Notify(new bool, torrent s.TorrentInfo) {
 				name = strings.Replace(name, k, v, -1)
 			}
 		}
+		newIndexes, err := notifier.FormatIndexesMessage(torrent.Files, tg.Messages.singleIndexTmpl,
+			tg.Messages.multipleIndexesTmpl, notifier.MsgNewIndexes)
+		if err != nil {
+			logger.Error(err)
+		}
 		if msg, err := notifier.FormatMessage(tg.Messages.announceTmpl, map[string]interface{}{
-			msgAction:    action,
-			msgName:      name,
-			msgSize:      notifier.FormatFileSize(torrent.Length),
-			msgUrl:       torrent.URL,
-			msgFileCount: len(torrent.Files),
-			msgMeta:      torrent.Meta,
+			notifier.MsgAction:     action,
+			notifier.MsgName:       name,
+			notifier.MsgSize:       notifier.FormatFileSize(torrent.Length),
+			notifier.MsgUrl:        torrent.URL,
+			notifier.MsgFileCount:  len(torrent.Files),
+			notifier.MsgMeta:       torrent.Meta,
+			notifier.MsgNewIndexes: newIndexes,
 		}); err == nil {
 			tg.sendMsgToMobs(msg, torrent.Image)
 		} else {
@@ -344,7 +352,7 @@ func (tg Notifier) NxGet(offset uint) {
 	} else {
 		logger.Debugf("Notifying %d GET", offset)
 		if msg, err := notifier.FormatMessage(tg.Messages.nxTmpl, map[string]interface{}{
-			msgIndex: offset,
+			notifier.MsgIndex: offset,
 		}); err == nil {
 			tg.sendMsgToMobs(msg, nil)
 		} else {

@@ -1,0 +1,18 @@
+{
+	"token": "abscdf1234567",
+	"grouids": [
+		1234
+	],
+	"ignoreunchanged": true,
+	"msg": {
+		"announce": "Torrent {{.action}}\nName: {{.meta.name_en}} (File name: {{.name}})\nSize: {{.size}}\nFile count: {{.filecount}}\n{{.newindexes}}\n{{.url}}\n",
+		"n1x": "Anniversary release: {{.index}}",
+		"added": "Added",
+		"updated": "Updated",
+		"singleindex": "Added {{.newindexes}} file",
+		"multipleindexes": "Added {{.newindexes}} files",
+		"replacements": {
+			"_": " "
+		}
+	}
+}

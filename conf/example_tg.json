@@ -6,10 +6,12 @@
 	"filestorepath": "/tmp/tgf",
 	"otpseed": "SOMERANDOMBASE32LONGSTRING",
 	"msg": {
-		"announce": "**Torrent {{.action}}**\nName: `{{.meta.name_en}} (File name: {{.name}})`\nSize: `{{.size}}`\nFile count: `{{.filecount}}`\n[Download📥]({{.url}})\n",
+		"announce": "**Torrent {{.action}}**\nName: `{{.meta.name_en}} (File name: {{.name}})`\nSize: `{{.size}}`\nFile count: `{{.filecount}}`\n{{.newindexes}}\n[Download📥]({{.url}})\n",
 		"n1x": "Anniversary release: {{.index}}",
 		"added": "Added",
 		"updated": "Updated",
+		"singleindex": "Added {{.newindexes}} file",
+		"multipleindexes": "Added {{.newindexes}} files",
 		"error": "Error: ",
 		"auth": "Unauthorized",
 		"state": "Observer: {{.watch}}\nAdmin: {{.admin}}\nNext index: {{.index}}",
