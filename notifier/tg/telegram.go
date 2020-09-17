@@ -325,7 +325,7 @@ func (tg Notifier) Notify(new bool, torrent s.TorrentInfo) {
 				name = strings.Replace(name, k, v, -1)
 			}
 		}
-		newIndexes, err := notifier.FormatIndexesMessage(torrent.Files, tg.Messages.singleIndexTmpl,
+		newIndexes, err := notifier.FormatIndexesMessage(notifier.GetNewFilesIndexes(torrent.Files), tg.Messages.singleIndexTmpl,
 			tg.Messages.multipleIndexesTmpl, notifier.MsgNewIndexes)
 		if err != nil {
 			logger.Error(err)
@@ -347,7 +347,7 @@ func (tg Notifier) Notify(new bool, torrent s.TorrentInfo) {
 }
 
 func (tg Notifier) NxGet(offset uint) {
-	if tg.Messages.Nx == "" {
+	if len(tg.Messages.Nx) == 0 {
 		logger.Warning("Nx message not set")
 	} else {
 		logger.Debugf("Notifying %d GET", offset)

@@ -131,10 +131,10 @@ func GetNewFilesIndexes(files map[string]bool) []int {
 	return indexes
 }
 
-func FormatIndexesMessage(files map[string]bool, singleMsgTmpl, mulMsgTmpl *template.Template, placeholder string) (string, error){
+func FormatIndexesMessage(idxs []int, singleMsgTmpl, mulMsgTmpl *template.Template, placeholder string) (string, error){
 	var err error
 	var msg string
-	if idxs := GetNewFilesIndexes(files); len(idxs) > 0{
+	if len(idxs) > 0{
 		var tmpl *template.Template
 		if len(idxs) == 1 {
 			tmpl = singleMsgTmpl

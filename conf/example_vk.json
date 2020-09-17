@@ -1,11 +1,12 @@
 {
 	"token": "abscdf1234567",
-	"grouids": [
+	"groupids": [
 		1234
 	],
 	"ignoreunchanged": true,
+	"ignoreregexp": "(?i).*1080p?.*",
 	"msg": {
-		"announce": "Torrent {{.action}}\nName: {{.meta.name_en}} (File name: {{.name}})\nSize: {{.size}}\nFile count: {{.filecount}}\n{{.newindexes}}\n{{.url}}\n",
+		"announce": "Torrent {{.action}}\nName: {{.meta.name_en}} (File name: {{.name}})\nSize: {{.size}}\nFile count: {{.filecount}}\n{{.newindexes}}\n{{.url}}\n{{.tags}}",
 		"n1x": "Anniversary release: {{.index}}",
 		"added": "Added",
 		"updated": "Updated",
@@ -13,6 +14,10 @@
 		"multipleindexes": "Added {{.newindexes}} files",
 		"replacements": {
 			"_": " "
-		}
+		},
+		"tags": {
+			"name_en": true
+		},
+		"tagsseparator": ","
 	}
 }

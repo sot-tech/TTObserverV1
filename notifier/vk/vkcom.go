@@ -36,13 +36,21 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"regexp"
 	"sot-te.ch/TTObserverV1/notifier"
 	s "sot-te.ch/TTObserverV1/shared"
 	"strings"
 	tmpl "text/template"
 )
 
+const (
+	msgTags = "tags"
+)
+
 var logger = logging.MustGetLogger("vk")
+var nonLetterNumberSpaceRegexp = regexp.MustCompile(`(?m)[^\p{L}\p{N}_\s]`)
+var isEmptyRegexp = regexp.MustCompile("^$")
+var allSpacesRegexp = regexp.MustCompile(`(?m)\s`)
 
 func init() {
 	notifier.RegisterNotifier("vkcom", &Notifier{})
@@ -53,6 +61,7 @@ type Notifier struct {
 	Token           string `json:"token"`
 	GroupIds        []uint `json:"groupids"`
 	IgnoreUnchanged bool   `json:"ignoreunchanged"`
+	IgnoreRegexp    string `json:"ignoreregexp"`
 	Messages        struct {
 		Announce            string `json:"announce"`
 		announceTmpl        *tmpl.Template
@@ -65,8 +74,11 @@ type Notifier struct {
 		singleIndexTmpl     *tmpl.Template
 		MultipleIndexes     string `json:"multipleindexes"`
 		multipleIndexesTmpl *tmpl.Template
+		Tags                map[string]bool `json:"tags"`
+		TagsSeparator       string          `json:"tagsseparator"`
 	} `json:"msg"`
-	db *s.Database
+	ignorePattern *regexp.Regexp
+	db            *s.Database
 }
 
 func (vk Notifier) New(configPath string, db *s.Database) (notifier.Notifier, error) {
@@ -78,18 +90,25 @@ func (vk Notifier) New(configPath string, db *s.Database) (notifier.Notifier, er
 	if confBytes, err = ioutil.ReadFile(configPath); err == nil {
 		if err = json.Unmarshal(confBytes, &n); err == nil {
 			if len(n.Token) > 0 {
-				var subErr error
-				if n.Messages.announceTmpl, subErr = tmpl.New("announce").Parse(n.Messages.Announce); subErr != nil {
-					logger.Error(subErr)
+				if len(n.IgnoreRegexp) == 0 {
+					n.ignorePattern = isEmptyRegexp //is empty
+				} else {
+					n.ignorePattern, err = regexp.Compile(n.IgnoreRegexp)
 				}
-				if n.Messages.nxTmpl, subErr = tmpl.New("n1000").Parse(n.Messages.Nx); subErr != nil {
-					logger.Error(subErr)
-				}
-				if n.Messages.singleIndexTmpl, subErr = tmpl.New("singleIndex").Parse(n.Messages.SingleIndex); subErr != nil {
-					logger.Error(subErr)
-				}
-				if n.Messages.multipleIndexesTmpl, subErr = tmpl.New("multipleIndexes").Parse(n.Messages.MultipleIndexes); subErr != nil {
-					logger.Error(subErr)
+				if err == nil {
+					var subErr error
+					if n.Messages.announceTmpl, subErr = tmpl.New("announce").Parse(n.Messages.Announce); subErr != nil {
+						logger.Error(subErr)
+					}
+					if n.Messages.nxTmpl, subErr = tmpl.New("n1000").Parse(n.Messages.Nx); subErr != nil {
+						logger.Error(subErr)
+					}
+					if n.Messages.singleIndexTmpl, subErr = tmpl.New("singleIndex").Parse(n.Messages.SingleIndex); subErr != nil {
+						logger.Error(subErr)
+					}
+					if n.Messages.multipleIndexesTmpl, subErr = tmpl.New("multipleIndexes").Parse(n.Messages.MultipleIndexes); subErr != nil {
+						logger.Error(subErr)
+					}
 				}
 			} else {
 				err = errors.New("unable to initialize vk client, tokens are empty")
@@ -99,7 +118,7 @@ func (vk Notifier) New(configPath string, db *s.Database) (notifier.Notifier, er
 	return n, err
 }
 
-func uploadImage(api *vkapi.API, photo []byte, groupId uint) (string, error){
+func uploadImage(api *vkapi.API, photo []byte, groupId uint) (string, error) {
 	var err error
 	var photoAttachment string
 	var uploadServerResult *vkapi.PhotosGetWallUploadServerResp
@@ -130,57 +149,96 @@ func uploadImage(api *vkapi.API, photo []byte, groupId uint) (string, error){
 	return photoAttachment, err
 }
 
+func (vk Notifier) buildHashTags(meta map[string]string) string {
+	sb := strings.Builder{}
+	if len(meta) > 0 && len(vk.Messages.Tags) > 0 {
+		for tag, multivalued := range vk.Messages.Tags {
+			m := meta[tag]
+			if len(m) > 0 {
+				if multivalued {
+					for _, mPart := range strings.Split(m, vk.Messages.TagsSeparator) {
+						mPart = strings.TrimSpace(mPart)
+						if len(mPart) > 0 {
+							mPart = nonLetterNumberSpaceRegexp.ReplaceAllString(mPart, "")
+							mPart = allSpacesRegexp.ReplaceAllString(mPart, "_")
+							if len(mPart) > 0 {
+								sb.WriteRune('#')
+								sb.WriteString(mPart)
+								sb.WriteRune(' ')
+							}
+						}
+					}
+				} else {
+					m = strings.TrimSpace(m)
+					m = nonLetterNumberSpaceRegexp.ReplaceAllString(m, "")
+					m = allSpacesRegexp.ReplaceAllString(m, "_")
+					if len(m) > 0 {
+						sb.WriteRune('#')
+						sb.WriteString(m)
+						sb.WriteRune(' ')
+					}
+				}
+			}
+		}
+	}
+	return sb.String()
+}
+
 func (vk Notifier) Notify(isNew bool, torrent s.TorrentInfo) {
 	var err error
 	if len(vk.Messages.Announce) > 0 {
-		if api := vkapi.NewClient(vk.Token); api != nil {
-			for _, groupId := range vk.GroupIds {
-				var photoAttachment string
-				if len(torrent.Image) > 0 {
-					photoAttachment, err = uploadImage(api, torrent.Image, groupId)
-				}
-				if err != nil {
-					logger.Error(err)
-				}
-				action := vk.Messages.Updated
-				if isNew {
-					action = vk.Messages.Added
-				}
-				logger.Debugf("Announcing %s for %s", action, torrent.Name)
-				name := torrent.Name
-				if len(vk.Messages.Replacements) > 0 {
-					for k, v := range vk.Messages.Replacements {
-						name = strings.Replace(name, k, v, -1)
+		changedIndexes := notifier.GetNewFilesIndexes(torrent.Files)
+		if vk.IgnoreUnchanged && len(changedIndexes) > 0 || !vk.IgnoreUnchanged && !vk.ignorePattern.MatchString(torrent.Name) {
+			if api := vkapi.NewClient(vk.Token); api != nil {
+				for _, groupId := range vk.GroupIds {
+					var photoAttachment string
+					if len(torrent.Image) > 0 {
+						photoAttachment, err = uploadImage(api, torrent.Image, groupId)
 					}
-				}
-				newIndexes, err := notifier.FormatIndexesMessage(torrent.Files, vk.Messages.singleIndexTmpl,
-					vk.Messages.multipleIndexesTmpl, notifier.MsgNewIndexes)
-				if err != nil {
-					logger.Error(err)
-				}
-				if msg, err := notifier.FormatMessage(vk.Messages.announceTmpl, map[string]interface{}{
-					notifier.MsgAction:     action,
-					notifier.MsgName:       name,
-					notifier.MsgSize:       notifier.FormatFileSize(torrent.Length),
-					notifier.MsgUrl:        torrent.URL,
-					notifier.MsgFileCount:  len(torrent.Files),
-					notifier.MsgMeta:       torrent.Meta,
-					notifier.MsgNewIndexes: newIndexes,
-				}); err == nil {
-					params := vkapi.WallPostParams{
-						OwnerID:     -int(groupId),
-						FromGroup:   true,
-						Message:     msg,
-						Attachments: photoAttachment,
+					if err != nil {
+						logger.Error(err)
 					}
-					var wallResp *vkapi.WallPostResp
-					if wallResp, err = api.WallPost(params); err == nil {
-						logger.Debug(wallResp.PostID)
+					action := vk.Messages.Updated
+					if isNew {
+						action = vk.Messages.Added
 					}
-				}
+					logger.Debugf("Announcing %s for %s", action, torrent.Name)
+					name := torrent.Name
+					if len(vk.Messages.Replacements) > 0 {
+						for k, v := range vk.Messages.Replacements {
+							name = strings.Replace(name, k, v, -1)
+						}
+					}
+					newIndexes, err := notifier.FormatIndexesMessage(changedIndexes, vk.Messages.singleIndexTmpl,
+						vk.Messages.multipleIndexesTmpl, notifier.MsgNewIndexes)
+					if err != nil {
+						logger.Error(err)
+					}
+					if msg, err := notifier.FormatMessage(vk.Messages.announceTmpl, map[string]interface{}{
+						notifier.MsgAction:     action,
+						notifier.MsgName:       name,
+						notifier.MsgSize:       notifier.FormatFileSize(torrent.Length),
+						notifier.MsgUrl:        torrent.URL,
+						notifier.MsgFileCount:  len(torrent.Files),
+						notifier.MsgMeta:       torrent.Meta,
+						notifier.MsgNewIndexes: newIndexes,
+						msgTags:                vk.buildHashTags(torrent.Meta),
+					}); err == nil {
+						params := vkapi.WallPostParams{
+							OwnerID:     -int(groupId),
+							FromGroup:   true,
+							Message:     msg,
+							Attachments: photoAttachment,
+						}
+						var wallResp *vkapi.WallPostResp
+						if wallResp, err = api.WallPost(params); err == nil {
+							logger.Debugf("New post ID %d", wallResp.PostID)
+						}
+					}
 
-				if err != nil {
-					logger.Error(err)
+					if err != nil {
+						logger.Error(err)
+					}
 				}
 			}
 		}
@@ -188,6 +246,29 @@ func (vk Notifier) Notify(isNew bool, torrent s.TorrentInfo) {
 		logger.Warning("Announce message not set")
 	}
 }
-func (vk Notifier) NxGet(_ uint) {}
+func (vk Notifier) NxGet(offset uint) {
+	if len(vk.Messages.Nx) > 0{
+		if api := vkapi.NewClient(vk.Token); api != nil {
+			for _, groupId := range vk.GroupIds {
+				logger.Debugf("Notifying %d GET", offset)
+				if msg, err := notifier.FormatMessage(vk.Messages.nxTmpl, map[string]interface{}{
+					notifier.MsgIndex: offset,
+				}); err == nil {
+					params := vkapi.WallPostParams{
+						OwnerID:     -int(groupId),
+						FromGroup:   true,
+						Message:     msg,
+					}
+					var wallResp *vkapi.WallPostResp
+					if wallResp, err = api.WallPost(params); err == nil {
+						logger.Debugf("New post ID %d", wallResp.PostID)
+					}
+				} else {
+					logger.Error(err)
+				}
+			}
+		}
+	}
+}
 
 func (vk Notifier) Close() {}
