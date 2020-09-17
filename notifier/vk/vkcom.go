@@ -49,6 +49,7 @@ func init() {
 }
 
 type Notifier struct {
+	//we need scopes: photos,wall,groups,offline
 	Token           string `json:"token"`
 	GroupIds        []uint `json:"groupids"`
 	IgnoreUnchanged bool   `json:"ignoreunchanged"`
