@@ -188,7 +188,7 @@ func (vk Notifier) Notify(isNew bool, torrent s.TorrentInfo) {
 	var err error
 	if len(vk.Messages.Announce) > 0 {
 		changedIndexes := notifier.GetNewFilesIndexes(torrent.Files)
-		if vk.IgnoreUnchanged && len(changedIndexes) > 0 || !vk.IgnoreUnchanged && !vk.ignorePattern.MatchString(torrent.Name) {
+		if (vk.IgnoreUnchanged && len(changedIndexes) > 0 || !vk.IgnoreUnchanged) && !vk.ignorePattern.MatchString(torrent.Name) {
 			if api := vkapi.NewClient(vk.Token); api != nil {
 				for _, groupId := range vk.GroupIds {
 					var photoAttachment string
@@ -247,7 +247,7 @@ func (vk Notifier) Notify(isNew bool, torrent s.TorrentInfo) {
 	}
 }
 func (vk Notifier) NxGet(offset uint) {
-	if len(vk.Messages.Nx) > 0{
+	if len(vk.Messages.Nx) > 0 {
 		if api := vkapi.NewClient(vk.Token); api != nil {
 			for _, groupId := range vk.GroupIds {
 				logger.Debugf("Notifying %d GET", offset)
@@ -255,9 +255,9 @@ func (vk Notifier) NxGet(offset uint) {
 					notifier.MsgIndex: offset,
 				}); err == nil {
 					params := vkapi.WallPostParams{
-						OwnerID:     -int(groupId),
-						FromGroup:   true,
-						Message:     msg,
+						OwnerID:   -int(groupId),
+						FromGroup: true,
+						Message:   msg,
 					}
 					var wallResp *vkapi.WallPostResp
 					if wallResp, err = api.WallPost(params); err == nil {
