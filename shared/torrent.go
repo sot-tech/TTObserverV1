@@ -126,7 +126,7 @@ func GetTorrentPoster(imageUrl string, maxSize uint) (error, []byte) {
 					img = resize.Thumbnail(maxSize, maxSize, img, resize.Bicubic)
 				}
 				imgBuffer := bytes.Buffer{}
-				if err = jpeg.Encode(&imgBuffer, img, nil); err == nil {
+				if err = jpeg.Encode(&imgBuffer, img, &jpeg.Options{Quality: 90}); err == nil {
 					torrentImage, err = ioutil.ReadAll(&imgBuffer)
 				}
 			}
