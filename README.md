@@ -9,12 +9,13 @@ Can:
 
 Uses:
 
- - [go-logging (BSD-3)](https://github.com/op/go-logging)
- - [Go Bencode (MIT)](https://github.com/zeebo/bencode)
- - [Go-SQLLite3 (MIT)](https://github.com/mattn/go-sqlite3)
+ - [op/go-logging (BSD-3)](https://github.com/op/go-logging)
+ - [zeebo/bencode (MIT)](https://github.com/zeebo/bencode)
+ - [mattn/go-sqlite3 (MIT)](https://github.com/mattn/go-sqlite3)
+ - [nfnt/resize (ISC)](https://github.com/nfnt/resize)
  - sot-te.ch/GoHTExtractor (BSD-3)
  - sot-te.ch/GoMTHelper (BSD-3) only for telegram
- - [Go-VKAPI (MIT)](https://github.com/azzzak/vkapi) only for vk.com
+ - [azzzak/vkapi (MIT)](https://github.com/azzzak/vkapi) only for vk.com
  
 # Usage
 ## Quick start
