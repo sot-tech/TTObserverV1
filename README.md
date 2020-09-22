@@ -14,7 +14,7 @@ Uses:
  - [Go-SQLLite3 (MIT)](https://github.com/mattn/go-sqlite3)
  - sot-te.ch/GoHTExtractor (BSD-3)
  - sot-te.ch/GoMTHelper (BSD-3) only for telegram
- - [Go-VKAPI (MIT)](github.com/azzzak/vkapi) only for vk.com
+ - [Go-VKAPI (MIT)](https://github.com/azzzak/vkapi) only for vk.com
  
 # Usage
 ## Quick start
