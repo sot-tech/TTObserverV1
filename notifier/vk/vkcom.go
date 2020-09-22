@@ -98,7 +98,7 @@ func (vk Notifier) New(configPath string, db *s.Database) (notifier.Notifier, er
 				}
 				if err == nil {
 					var subErr error
-					n.client = vkapi.NewClient(vk.Token)
+					n.client = vkapi.NewClient(n.Token)
 					if n.Messages.announceTmpl, subErr = tmpl.New("announce").Parse(n.Messages.Announce); subErr != nil {
 						logger.Error(subErr)
 					}
