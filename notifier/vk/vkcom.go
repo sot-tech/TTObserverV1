@@ -36,6 +36,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"sot-te.ch/TTObserverV1/notifier"
 	s "sot-te.ch/TTObserverV1/shared"
@@ -88,7 +89,7 @@ func (vk Notifier) New(configPath string, db *s.Database) (notifier.Notifier, er
 		db: db,
 	}
 	var confBytes []byte
-	if confBytes, err = ioutil.ReadFile(configPath); err == nil {
+	if confBytes, err = ioutil.ReadFile(filepath.Clean(configPath)); err == nil {
 		if err = json.Unmarshal(confBytes, &n); err == nil {
 			if len(n.Token) > 0 {
 				if len(n.IgnoreRegexp) == 0 {

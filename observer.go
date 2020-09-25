@@ -36,6 +36,7 @@ import (
 	_ "image/png"
 	"io/ioutil"
 	"math/rand"
+	"path/filepath"
 	"sot-te.ch/HTExtractor"
 	"sot-te.ch/TTObserverV1/notifier"
 	_ "sot-te.ch/TTObserverV1/notifier/tg"
@@ -71,7 +72,7 @@ var logger = logging.MustGetLogger("observer")
 
 func ReadConfig(path string) (*Observer, error) {
 	var config Observer
-	confData, err := ioutil.ReadFile(path)
+	confData, err := ioutil.ReadFile(filepath.Clean(path))
 	if err == nil {
 		err = json.Unmarshal(confData, &config)
 	}

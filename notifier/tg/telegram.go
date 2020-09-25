@@ -34,6 +34,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	mt "sot-te.ch/MTHelper"
 	"sot-te.ch/TTObserverV1/notifier"
 	s "sot-te.ch/TTObserverV1/shared"
@@ -300,7 +301,7 @@ func (tg Notifier) New(configPath string, db *s.Database) (notifier.Notifier, er
 		db: db,
 	}
 	var confBytes []byte
-	if confBytes, err = ioutil.ReadFile(configPath); err == nil {
+	if confBytes, err = ioutil.ReadFile(filepath.Clean(configPath)); err == nil {
 		if err = json.Unmarshal(confBytes, &n); err == nil {
 			if err = n.initTg(); err == nil {
 				go n.client.HandleUpdates()
