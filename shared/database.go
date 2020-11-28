@@ -65,7 +65,7 @@ const (
 	insertTorrentFile           = "INSERT INTO TT_TORRENT_FILE(TORRENT, NAME) VALUES ($1, $2) ON CONFLICT (TORRENT,NAME) DO NOTHING"
 
 	selectTorrentImage = "SELECT IMAGE FROM TT_TORRENT WHERE ID = $1"
-	insertTorrentImage = "UPDATE TT_TORRENT SET IMAGE = $2 WHERE ID = $1"
+	insertTorrentImage = "UPDATE TT_TORRENT SET IMAGE = $1 WHERE ID = $2"
 
 	selectConfig         = "SELECT VALUE FROM TT_CONFIG WHERE NAME = $1"
 	insertOrUpdateConfig = "INSERT INTO TT_CONFIG(NAME, VALUE) VALUES ($1, $2) ON CONFLICT(NAME) DO UPDATE SET VALUE = EXCLUDED.VALUE"
@@ -389,7 +389,7 @@ func (db *Database) GetTorrentImage(id int64) ([]byte, error) {
 }
 
 func (db *Database) AddTorrentImage(id int64, image []byte) error {
-	return db.execNoResult(insertTorrentImage, id, image)
+	return db.execNoResult(insertTorrentImage, image, id)
 }
 
 func (db *Database) Connect(path string) error {
