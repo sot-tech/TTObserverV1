@@ -54,7 +54,7 @@ const (
 	selectTorrentId       = "SELECT ID FROM TT_TORRENT WHERE NAME = $1"
 	selectTorrents        = "SELECT ID, NAME FROM TT_TORRENT WHERE NAME LIKE $1"
 	existTorrent          = "SELECT 1 FROM TT_TORRENT WHERE ID = $1"
-	insertOrUpdateTorrent = "INSERT INTO TT_TORRENT(NAME) VALUES ($1) ON CONFLICT(NAME) DO NOTHING"
+	insertOrUpdateTorrent = "INSERT INTO TT_TORRENT(NAME, DATA) VALUES ($1, $2) ON CONFLICT(NAME) DO UPDATE SET DATA = EXCLUDED.DATA"
 
 	selectTorrentMeta = "SELECT NAME, VALUE FROM TT_TORRENT_META WHERE TORRENT = $1"
 	insertTorrentMeta = "INSERT INTO TT_TORRENT_META(TORRENT, NAME, VALUE) VALUES($1, $2, $3) ON CONFLICT(TORRENT,NAME) DO UPDATE SET VALUE = EXCLUDED.VALUE"
@@ -64,8 +64,8 @@ const (
 	selectTorrentFilesByTorrent = selectTorrentFiles + " WHERE TORRENT = $1"
 	insertTorrentFile           = "INSERT INTO TT_TORRENT_FILE(TORRENT, NAME) VALUES ($1, $2) ON CONFLICT (TORRENT,NAME) DO NOTHING"
 
-	selectTorrentImage = "SELECT IMAGE FROM TT_TORRENT_IMAGE WHERE TORRENT = $1"
-	insertTorrentImage = "INSERT INTO TT_TORRENT_IMAGE(TORRENT,IMAGE) VALUES($1,$2) ON CONFLICT(TORRENT) DO UPDATE SET IMAGE = EXCLUDED.IMAGE"
+	selectTorrentImage = "SELECT IMAGE FROM TT_TORRENT WHERE ID = $1"
+	insertTorrentImage = "UPDATE TT_TORRENT SET IMAGE = $2 WHERE ID = $1"
 
 	selectConfig         = "SELECT VALUE FROM TT_CONFIG WHERE NAME = $1"
 	insertOrUpdateConfig = "INSERT INTO TT_CONFIG(NAME, VALUE) VALUES ($1, $2) ON CONFLICT(NAME) DO UPDATE SET VALUE = EXCLUDED.VALUE"
@@ -225,10 +225,10 @@ func (db *Database) GetTorrents(pattern string) ([]DBTorrent, error) {
 	return torrents, err
 }
 
-func (db *Database) AddTorrent(name string, files []string) (int64, error) {
+func (db *Database) AddTorrent(name string, data []byte, files []string) (int64, error) {
 	var err error
 	var id int64
-	if err = db.execNoResult(insertOrUpdateTorrent, name); err == nil {
+	if err = db.execNoResult(insertOrUpdateTorrent, name, data); err == nil {
 		if id, err = db.GetTorrent(name); err == nil {
 			for _, file := range files {
 				err = db.execNoResult(insertTorrentFile, id, file)

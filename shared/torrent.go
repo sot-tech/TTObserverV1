@@ -46,6 +46,7 @@ type TorrentInfo struct {
 	Image  []byte
 	Meta   map[string]string
 	Files  map[string]bool
+	Data   []byte
 	Length uint64
 }
 
@@ -83,15 +84,23 @@ type Torrent struct {
 func GetTorrent(url string) (*TorrentInfo, error) {
 	var res *TorrentInfo
 	var err error
+	var data []byte
 	if resp, httpErr := http.Get(url); httpErr == nil && resp != nil && resp.StatusCode < 400 {
 		defer resp.Body.Close()
+		data, err = ioutil.ReadAll(resp.Body)
+	} else {
+		err = buildError(resp, httpErr, "get torrent")
+	}
+	if err == nil {
 		var torrent Torrent
-		err := bencode.NewDecoder(resp.Body).Decode(&torrent)
-		if err == nil {
+		byteBuffer := bytes.Buffer{}
+		byteBuffer.Write(data)
+		if err = bencode.NewDecoder(&byteBuffer).Decode(&torrent); err == nil {
 			res = &TorrentInfo{
 				Name:  torrent.Info.Name,
 				URL:   torrent.PublisherUrl,
 				Files: make(map[string]bool),
+				Data: data,
 			}
 			if torrent.Info.Files != nil {
 				for _, file := range torrent.Info.Files {
@@ -107,12 +116,9 @@ func GetTorrent(url string) (*TorrentInfo, error) {
 				res.Length = torrent.Info.Length
 			}
 		}
-	} else {
-		err = buildError(resp, httpErr, "get torrent")
 	}
 	return res, err
 }
-
 
 func GetTorrentPoster(imageUrl string, maxSize uint) (error, []byte) {
 	var err error
@@ -142,7 +148,7 @@ func GetTorrentPoster(imageUrl string, maxSize uint) (error, []byte) {
 func buildError(resp *http.Response, httpErr error, desc string) error {
 	sb := strings.Builder{}
 	sb.WriteString(desc)
-	if sb.Len() > 0{
+	if sb.Len() > 0 {
 		sb.WriteRune('.')
 	}
 	if httpErr != nil {

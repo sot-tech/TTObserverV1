@@ -187,6 +187,8 @@ func New(Notifiers []Config, db *tts.Database) (Announcer, error) {
 				break
 			}
 		}
+	} else{
+		logger.Warning("No notifiers specified")
 	}
 	return a, err
 }

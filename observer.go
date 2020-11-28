@@ -163,7 +163,7 @@ func (cr *Observer) CheckTorrent(offset uint) bool {
 					logger.Error(err)
 				}
 				isNew = torrentId == s.InvalidDBId
-				if torrentId, err = cr.db.AddTorrent(torrent.Name, torrent.NewFiles()); err != nil {
+				if torrentId, err = cr.db.AddTorrent(torrent.Name, torrent.Data, torrent.NewFiles()); err != nil {
 					logger.Error(err)
 				}
 				torrent.Id = torrentId
