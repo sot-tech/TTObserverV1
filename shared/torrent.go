@@ -126,16 +126,21 @@ func GetTorrentPoster(imageUrl string, maxSize uint) (error, []byte) {
 	if len(imageUrl) > 0 {
 		if resp, httpErr := http.Get(imageUrl); httpErr == nil && resp != nil && resp.StatusCode < 400 {
 			defer resp.Body.Close()
-			var img image.Image
-			if img, _, err = image.Decode(resp.Body); err == nil && img != nil {
-				if maxSize > 0 {
-					img = resize.Thumbnail(maxSize, maxSize, img, resize.Bicubic)
+			if maxSize > 0 {
+				var img image.Image
+				if img, _, err = image.Decode(resp.Body); err == nil && img != nil {
+					if maxSize > 0 {
+						img = resize.Thumbnail(maxSize, maxSize, img, resize.Bicubic)
+					}
+					imgBuffer := bytes.Buffer{}
+					if err = jpeg.Encode(&imgBuffer, img, &jpeg.Options{Quality: 90}); err == nil {
+						torrentImage, err = ioutil.ReadAll(&imgBuffer)
+					}
 				}
-				imgBuffer := bytes.Buffer{}
-				if err = jpeg.Encode(&imgBuffer, img, &jpeg.Options{Quality: 90}); err == nil {
-					torrentImage, err = ioutil.ReadAll(&imgBuffer)
-				}
+			} else{
+				torrentImage, err = ioutil.ReadAll(resp.Body)
 			}
+
 		} else {
 			err = buildError(resp, httpErr, "get poster")
 		}
