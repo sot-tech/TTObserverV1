@@ -101,7 +101,7 @@ func (cr *Observer) Init() error {
 	if len(cr.Announcers) > 0 {
 		cr.announcer, err = notifier.New(cr.Announcers, db)
 	} else {
-		err = errors.New("notifiers not set")
+		logger.Warning("notifiers not set")
 	}
 	return err
 }
