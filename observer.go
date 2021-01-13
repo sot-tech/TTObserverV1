@@ -39,6 +39,8 @@ import (
 	"path/filepath"
 	"sot-te.ch/HTExtractor"
 	"sot-te.ch/TTObserverV1/notifier"
+	_ "sot-te.ch/TTObserverV1/notifier/file"
+	_ "sot-te.ch/TTObserverV1/notifier/stan"
 	_ "sot-te.ch/TTObserverV1/notifier/tg"
 	_ "sot-te.ch/TTObserverV1/notifier/vk"
 	s "sot-te.ch/TTObserverV1/shared"

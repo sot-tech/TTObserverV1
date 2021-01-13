@@ -1,0 +1,4 @@
+{
+	"nametemplate": "/tmp/{{.index}}_{{.name}}.torrent",
+	"permissions": "0664"
+}

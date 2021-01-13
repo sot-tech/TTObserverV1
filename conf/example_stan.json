@@ -1,0 +1,6 @@
+{
+	"url": "nats://127.0.0.1:4222",
+	"clusterid": "tt",
+	"clientid": "ttobserver",
+	"subject": "tt.newtorrent"
+}
