@@ -43,7 +43,7 @@ Uses:
 	- metaactions - list of actions to extract meta info release (see GoHTExtractor readme)
     - imagemetafield - string - name of field from extracted by `metaactions` where picture data stored
     - imagethumb - uint - maximum image size (in pixels) to store in db and send through notifiers 
- - announcers - list of notifiers to send release info through
+ - producers - list of notifiers to send release info through
     - type - string - type of notifier, registered in the observer (look to notifier documentation)
     - configpath - string - path to notifier's config file
  - dbfile - string - path to database
