@@ -27,6 +27,8 @@
 package file
 
 import (
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,6 +41,11 @@ import (
 	s "sot-te.ch/TTObserverV1/shared"
 	"strconv"
 	tmpl "text/template"
+)
+
+const (
+	TmplId   = "id"
+	TmplHash = "hash"
 )
 
 var logger = logging.MustGetLogger("file")
@@ -63,7 +70,7 @@ func (st Notifier) New(configPath string, _ *s.Database) (notifier.Notifier, err
 			var stat os.FileInfo
 			if stat, err = os.Stat(filepath.Dir(n.NameTemplate)); err == nil {
 				if stat.IsDir() {
-					if n.nameTemplate, err = tmpl.New(fmt.Sprint("file_", rand.Uint32())).Parse(n.NameTemplate); err == nil{
+					if n.nameTemplate, err = tmpl.New(fmt.Sprint("file_", rand.Uint32())).Parse(n.NameTemplate); err == nil {
 						if len(n.Permissions) == 0 {
 							logger.Warning("Permissions parameter not set, falling to 0644")
 							n.perm = 0644
@@ -83,17 +90,21 @@ func (st Notifier) New(configPath string, _ *s.Database) (notifier.Notifier, err
 func (st Notifier) Notify(_ bool, torrent s.TorrentInfo) {
 	var err error
 	var fileName string
+	hash := sha1.New()
+	hash.Write([]byte(torrent.Name))
+
 	if fileName, err = notifier.FormatMessage(st.nameTemplate, map[string]interface{}{
 		notifier.MsgName: torrent.Name,
-		notifier.MsgIndex: torrent.Id,
-	}); err == nil{
-		if fileName = filepath.Clean(fileName); len(fileName) > 0{
+		TmplId:   torrent.Id,
+		TmplHash: base64.RawURLEncoding.EncodeToString(hash.Sum(nil)),
+	}); err == nil {
+		if fileName = filepath.Clean(fileName); len(fileName) > 0 {
 			err = ioutil.WriteFile(fileName, torrent.Data, os.FileMode(st.perm))
-		} else{
+		} else {
 			err = errors.New("filename is empty")
 		}
 	}
-	if err != nil{
+	if err != nil {
 		logger.Error(err)
 	}
 }

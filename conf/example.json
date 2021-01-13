@@ -50,6 +50,14 @@
 		{
 			"type": "vkcom",
 			"configpath": "conf/example_vk.json"
+		},
+		{
+			"type": "file",
+			"configpath": "conf/example_file.json"
+		},
+		{
+			"type": "stan",
+			"configpath": "conf/example_stan.json"
 		}
 	],
 	"dbfile": "var/lib/tto/tt.db"

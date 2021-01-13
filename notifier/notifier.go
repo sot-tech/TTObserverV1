@@ -131,14 +131,14 @@ func GetNewFilesIndexes(files map[string]bool) []int {
 	return indexes
 }
 
-func FormatIndexesMessage(idxs []int, singleMsgTmpl, mulMsgTmpl *template.Template, placeholder string) (string, error){
+func FormatIndexesMessage(idxs []int, singleMsgTmpl, mulMsgTmpl *template.Template, placeholder string) (string, error) {
 	var err error
 	var msg string
-	if len(idxs) > 0{
+	if len(idxs) > 0 {
 		var tmpl *template.Template
 		if len(idxs) == 1 {
 			tmpl = singleMsgTmpl
-		} else{
+		} else {
 			tmpl = mulMsgTmpl
 		}
 		sb := strings.Builder{}
@@ -166,7 +166,7 @@ func New(Notifiers []Config, db *tts.Database) (Announcer, error) {
 	var err error
 	a := Announcer{
 		notifiers: make([]Notifier, 0),
-		db: db,
+		db:        db,
 	}
 	if len(Notifiers) > 0 {
 		for i, n := range Notifiers {
@@ -184,10 +184,11 @@ func New(Notifiers []Config, db *tts.Database) (Announcer, error) {
 				err = errors.New(fmt.Sprint("notifier #", i, " unknown type: ", n.Type))
 			}
 			if err != nil {
+				logger.Error(err)
 				break
 			}
 		}
-	} else{
+	} else {
 		logger.Warning("No notifiers specified")
 	}
 	return a, err
