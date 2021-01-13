@@ -63,19 +63,19 @@ type Config struct {
 }
 
 var logger = logging.MustGetLogger("notifier")
-var notifi = make(map[string]Notifier)
-var notifiMu sync.Mutex
+var producers = make(map[string]Notifier)
+var producersMu sync.Mutex
 
 func RegisterNotifier(name string, n Notifier) {
-	notifiMu.Lock()
-	defer notifiMu.Unlock()
+	producersMu.Lock()
+	defer producersMu.Unlock()
 	if len(name) == 0 {
 		panic("unspecified notifier name")
 	} else if n == nil {
 		panic("unspecified notifier ref instance")
 	} else {
 		logger.Debug("Registering new notifier ", name)
-		notifi[name] = n
+		producers[name] = n
 	}
 }
 
@@ -170,7 +170,7 @@ func New(Notifiers []Config, db *tts.Database) (Announcer, error) {
 	}
 	if len(Notifiers) > 0 {
 		for i, n := range Notifiers {
-			if ni := notifi[n.Type]; ni != nil {
+			if ni := producers[n.Type]; ni != nil {
 				var nn Notifier
 				logger.Debug("Initiating new notifier ", n.Type)
 				if nn, err = ni.New(n.ConfigPath, db); err == nil {

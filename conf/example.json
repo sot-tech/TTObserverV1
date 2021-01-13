@@ -42,7 +42,7 @@
 		"imagemetafield": "poster",
 		"imagethumb": 1280
 	},
-	"announcers": [
+	"producers": [
 		{
 			"type": "telegram",
 			"configpath": "conf/example_tg.json"

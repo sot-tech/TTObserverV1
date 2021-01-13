@@ -64,7 +64,7 @@ type Observer struct {
 		ImageThumb     uint                        `json:"imagethumb"`
 		metaExtractor  *HTExtractor.Extractor
 	} `json:"crawler"`
-	Announcers []producer.Config `json:"announcers"`
+	Announcers []producer.Config `json:"producers"`
 	DBFile     string            `json:"dbfile"`
 	db         *s.Database
 	announcer  producer.Announcer
