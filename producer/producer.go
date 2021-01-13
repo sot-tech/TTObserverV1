@@ -50,8 +50,8 @@ const (
 	MsgNewIndexes = "newindexes"
 )
 
-type Notifier interface {
-	New(string, *tts.Database) (Notifier, error)
+type Producer interface {
+	New(string, *tts.Database) (Producer, error)
 	Send(bool, tts.TorrentInfo)
 	SendNxGet(uint)
 	Close()
@@ -63,10 +63,10 @@ type Config struct {
 }
 
 var logger = logging.MustGetLogger("notifier")
-var producers = make(map[string]Notifier)
+var producers = make(map[string]Producer)
 var producersMu sync.Mutex
 
-func RegisterNotifier(name string, n Notifier) {
+func RegisterNotifier(name string, n Producer) {
 	producersMu.Lock()
 	defer producersMu.Unlock()
 	if len(name) == 0 {
@@ -158,20 +158,20 @@ func FormatIndexesMessage(idxs []int, singleMsgTmpl, mulMsgTmpl *template.Templa
 }
 
 type Announcer struct {
-	notifiers []Notifier
+	notifiers []Producer
 	db        *tts.Database
 }
 
 func New(Notifiers []Config, db *tts.Database) (Announcer, error) {
 	var err error
 	a := Announcer{
-		notifiers: make([]Notifier, 0),
+		notifiers: make([]Producer, 0),
 		db:        db,
 	}
 	if len(Notifiers) > 0 {
 		for i, n := range Notifiers {
 			if ni := producers[n.Type]; ni != nil {
-				var nn Notifier
+				var nn Producer
 				logger.Debug("Initiating new notifier ", n.Type)
 				if nn, err = ni.New(n.ConfigPath, db); err == nil {
 					if nn != nil {

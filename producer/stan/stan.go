@@ -71,7 +71,7 @@ func (st *Notifier) reconnect(prevConn stan.Conn, cause error) {
 	}
 }
 
-func (st Notifier) New(configPath string, db *s.Database) (producer.Notifier, error) {
+func (st Notifier) New(configPath string, db *s.Database) (producer.Producer, error) {
 	var err error
 	n := Notifier{
 		db: db,

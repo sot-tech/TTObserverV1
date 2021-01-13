@@ -61,7 +61,7 @@ type Notifier struct {
 	perm         uint64
 }
 
-func (st Notifier) New(configPath string, _ *s.Database) (producer.Notifier, error) {
+func (st Notifier) New(configPath string, _ *s.Database) (producer.Producer, error) {
 	var err error
 	n := Notifier{}
 	var confBytes []byte

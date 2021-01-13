@@ -83,7 +83,7 @@ type Notifier struct {
 	db            *s.Database
 }
 
-func (vk Notifier) New(configPath string, db *s.Database) (producer.Notifier, error) {
+func (vk Notifier) New(configPath string, db *s.Database) (producer.Producer, error) {
 	var err error
 	n := Notifier{
 		db: db,

@@ -295,7 +295,7 @@ func (tg *Notifier) sendMsgToMobs(msg string, photo []byte) {
 	}
 }
 
-func (tg Notifier) New(configPath string, db *s.Database) (producer.Notifier, error) {
+func (tg Notifier) New(configPath string, db *s.Database) (producer.Producer, error) {
 	var err error
 	n := Notifier{
 		db: db,
