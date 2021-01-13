@@ -24,7 +24,7 @@
  * OF SUCH DAMAGE.
  */
 
-package notifier
+package producer
 
 import (
 	"bytes"
@@ -52,8 +52,8 @@ const (
 
 type Notifier interface {
 	New(string, *tts.Database) (Notifier, error)
-	Notify(bool, tts.TorrentInfo)
-	NxGet(uint)
+	Send(bool, tts.TorrentInfo)
+	SendNxGet(uint)
 	Close()
 }
 
@@ -194,15 +194,15 @@ func New(Notifiers []Config, db *tts.Database) (Announcer, error) {
 	return a, err
 }
 
-func (a Announcer) Notify(new bool, torrent tts.TorrentInfo) {
+func (a Announcer) Send(new bool, torrent tts.TorrentInfo) {
 	for _, n := range a.notifiers {
-		n.Notify(new, torrent)
+		n.Send(new, torrent)
 	}
 }
 
-func (a Announcer) NxGet(offset uint) {
+func (a Announcer) SendNxGet(offset uint) {
 	for _, n := range a.notifiers {
-		n.NxGet(offset)
+		n.SendNxGet(offset)
 	}
 }
 

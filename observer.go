@@ -38,11 +38,11 @@ import (
 	"math/rand"
 	"path/filepath"
 	"sot-te.ch/HTExtractor"
-	"sot-te.ch/TTObserverV1/notifier"
-	_ "sot-te.ch/TTObserverV1/notifier/file"
-	_ "sot-te.ch/TTObserverV1/notifier/stan"
-	_ "sot-te.ch/TTObserverV1/notifier/tg"
-	_ "sot-te.ch/TTObserverV1/notifier/vk"
+	"sot-te.ch/TTObserverV1/producer"
+	_ "sot-te.ch/TTObserverV1/producer/file"
+	_ "sot-te.ch/TTObserverV1/producer/stan"
+	_ "sot-te.ch/TTObserverV1/producer/tg"
+	_ "sot-te.ch/TTObserverV1/producer/vk"
 	s "sot-te.ch/TTObserverV1/shared"
 	"strings"
 	"time"
@@ -64,10 +64,10 @@ type Observer struct {
 		ImageThumb     uint                        `json:"imagethumb"`
 		metaExtractor  *HTExtractor.Extractor
 	} `json:"crawler"`
-	Announcers []notifier.Config `json:"announcers"`
+	Announcers []producer.Config `json:"announcers"`
 	DBFile     string            `json:"dbfile"`
 	db         *s.Database
-	announcer  notifier.Announcer
+	announcer  producer.Announcer
 }
 
 var logger = logging.MustGetLogger("observer")
@@ -101,7 +101,7 @@ func (cr *Observer) Init() error {
 	var err error
 	logger.Debug("Initiating notifiers")
 	if len(cr.Announcers) > 0 {
-		cr.announcer, err = notifier.New(cr.Announcers, db)
+		cr.announcer, err = producer.New(cr.Announcers, db)
 	} else {
 		logger.Warning("notifiers not set")
 	}
@@ -171,7 +171,7 @@ func (cr *Observer) CheckTorrent(offset uint) bool {
 				torrent.Id = torrentId
 				cr.Notify(*torrent, fullContext, isNew)
 				if offset > 0 && offset%cr.Crawler.Anniversary == 0 {
-					cr.announcer.NxGet(offset)
+					cr.announcer.SendNxGet(offset)
 				}
 
 				res = true
@@ -242,6 +242,6 @@ func (cr *Observer) Notify(torrent s.TorrentInfo, context string, isNew bool) {
 	torrent.Meta = upstreamMeta
 	torrent.Image = torrentImage
 	torrent.URL = cr.Crawler.BaseURL + context
-	cr.announcer.Notify(isNew, torrent)
+	cr.announcer.Send(isNew, torrent)
 }
 

@@ -38,7 +38,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"regexp"
-	"sot-te.ch/TTObserverV1/notifier"
+	"sot-te.ch/TTObserverV1/producer"
 	s "sot-te.ch/TTObserverV1/shared"
 	"strings"
 	tmpl "text/template"
@@ -54,7 +54,7 @@ var isEmptyRegexp = regexp.MustCompile("^$")
 var allSpacesRegexp = regexp.MustCompile(`(?m)\s`)
 
 func init() {
-	notifier.RegisterNotifier("vkcom", &Notifier{})
+	producer.RegisterNotifier("vkcom", &Notifier{})
 }
 
 type Notifier struct {
@@ -83,7 +83,7 @@ type Notifier struct {
 	db            *s.Database
 }
 
-func (vk Notifier) New(configPath string, db *s.Database) (notifier.Notifier, error) {
+func (vk Notifier) New(configPath string, db *s.Database) (producer.Notifier, error) {
 	var err error
 	n := Notifier{
 		db: db,
@@ -187,10 +187,10 @@ func (vk Notifier) buildHashTags(meta map[string]string) string {
 	return sb.String()
 }
 
-func (vk Notifier) Notify(isNew bool, torrent s.TorrentInfo) {
+func (vk Notifier) Send(isNew bool, torrent s.TorrentInfo) {
 	var err error
 	if len(vk.Messages.Announce) > 0 {
-		changedIndexes := notifier.GetNewFilesIndexes(torrent.Files)
+		changedIndexes := producer.GetNewFilesIndexes(torrent.Files)
 		if (vk.IgnoreUnchanged && len(changedIndexes) > 0 || !vk.IgnoreUnchanged) && !vk.ignorePattern.MatchString(torrent.Name) {
 			if vk.client != nil {
 				for _, groupId := range vk.GroupIds {
@@ -212,19 +212,19 @@ func (vk Notifier) Notify(isNew bool, torrent s.TorrentInfo) {
 							name = strings.Replace(name, k, v, -1)
 						}
 					}
-					newIndexes, err := notifier.FormatIndexesMessage(changedIndexes, vk.Messages.singleIndexTmpl,
-						vk.Messages.multipleIndexesTmpl, notifier.MsgNewIndexes)
+					newIndexes, err := producer.FormatIndexesMessage(changedIndexes, vk.Messages.singleIndexTmpl,
+						vk.Messages.multipleIndexesTmpl, producer.MsgNewIndexes)
 					if err != nil {
 						logger.Error(err)
 					}
-					if msg, err := notifier.FormatMessage(vk.Messages.announceTmpl, map[string]interface{}{
-						notifier.MsgAction:     action,
-						notifier.MsgName:       name,
-						notifier.MsgSize:       notifier.FormatFileSize(torrent.Length),
-						notifier.MsgUrl:        torrent.URL,
-						notifier.MsgFileCount:  len(torrent.Files),
-						notifier.MsgMeta:       torrent.Meta,
-						notifier.MsgNewIndexes: newIndexes,
+					if msg, err := producer.FormatMessage(vk.Messages.announceTmpl, map[string]interface{}{
+						producer.MsgAction:     action,
+						producer.MsgName:       name,
+						producer.MsgSize:       producer.FormatFileSize(torrent.Length),
+						producer.MsgUrl:        torrent.URL,
+						producer.MsgFileCount:  len(torrent.Files),
+						producer.MsgMeta:       torrent.Meta,
+						producer.MsgNewIndexes: newIndexes,
 						msgTags:                vk.buildHashTags(torrent.Meta),
 					}); err == nil {
 						params := vkapi.WallPostParams{
@@ -249,13 +249,13 @@ func (vk Notifier) Notify(isNew bool, torrent s.TorrentInfo) {
 		logger.Warning("Announce message not set")
 	}
 }
-func (vk Notifier) NxGet(offset uint) {
+func (vk Notifier) SendNxGet(offset uint) {
 	if len(vk.Messages.Nx) > 0 {
 		if vk.client != nil {
 			for _, groupId := range vk.GroupIds {
 				logger.Debugf("Notifying %d GET", offset)
-				if msg, err := notifier.FormatMessage(vk.Messages.nxTmpl, map[string]interface{}{
-					notifier.MsgIndex: offset,
+				if msg, err := producer.FormatMessage(vk.Messages.nxTmpl, map[string]interface{}{
+					producer.MsgIndex: offset,
 				}); err == nil {
 					params := vkapi.WallPostParams{
 						OwnerID:   -int(groupId),

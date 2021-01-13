@@ -36,7 +36,7 @@ import (
 	"os"
 	"path/filepath"
 	mt "sot-te.ch/MTHelper"
-	"sot-te.ch/TTObserverV1/notifier"
+	"sot-te.ch/TTObserverV1/producer"
 	s "sot-te.ch/TTObserverV1/shared"
 	"strings"
 	tmpl "text/template"
@@ -55,7 +55,7 @@ const (
 var logger = logging.MustGetLogger("tg")
 
 func init() {
-	notifier.RegisterNotifier("telegram", &Notifier{})
+	producer.RegisterNotifier("telegram", &Notifier{})
 }
 
 type Notifier struct {
@@ -138,10 +138,10 @@ func (tg *Notifier) getState(chat int64) (string, error) {
 	if index, err = tg.db.GetCrawlOffset(); err != nil {
 		return "", err
 	}
-	return notifier.FormatMessage(tg.Messages.stateTmpl, map[string]interface{}{
+	return producer.FormatMessage(tg.Messages.stateTmpl, map[string]interface{}{
 		msgWatch:          isMob,
 		msgAdmin:          isAdmin,
-		notifier.MsgIndex: index,
+		producer.MsgIndex: index,
 	})
 }
 
@@ -295,7 +295,7 @@ func (tg *Notifier) sendMsgToMobs(msg string, photo []byte) {
 	}
 }
 
-func (tg Notifier) New(configPath string, db *s.Database) (notifier.Notifier, error) {
+func (tg Notifier) New(configPath string, db *s.Database) (producer.Notifier, error) {
 	var err error
 	n := Notifier{
 		db: db,
@@ -311,7 +311,7 @@ func (tg Notifier) New(configPath string, db *s.Database) (notifier.Notifier, er
 	return n, err
 }
 
-func (tg Notifier) Notify(new bool, torrent s.TorrentInfo) {
+func (tg Notifier) Send(new bool, torrent s.TorrentInfo) {
 	if tg.Messages.Announce == "" {
 		logger.Warning("Announce message not set")
 	} else {
@@ -326,19 +326,19 @@ func (tg Notifier) Notify(new bool, torrent s.TorrentInfo) {
 				name = strings.Replace(name, k, v, -1)
 			}
 		}
-		newIndexes, err := notifier.FormatIndexesMessage(notifier.GetNewFilesIndexes(torrent.Files), tg.Messages.singleIndexTmpl,
-			tg.Messages.multipleIndexesTmpl, notifier.MsgNewIndexes)
+		newIndexes, err := producer.FormatIndexesMessage(producer.GetNewFilesIndexes(torrent.Files), tg.Messages.singleIndexTmpl,
+			tg.Messages.multipleIndexesTmpl, producer.MsgNewIndexes)
 		if err != nil {
 			logger.Error(err)
 		}
-		if msg, err := notifier.FormatMessage(tg.Messages.announceTmpl, map[string]interface{}{
-			notifier.MsgAction:     action,
-			notifier.MsgName:       name,
-			notifier.MsgSize:       notifier.FormatFileSize(torrent.Length),
-			notifier.MsgUrl:        torrent.URL,
-			notifier.MsgFileCount:  len(torrent.Files),
-			notifier.MsgMeta:       torrent.Meta,
-			notifier.MsgNewIndexes: newIndexes,
+		if msg, err := producer.FormatMessage(tg.Messages.announceTmpl, map[string]interface{}{
+			producer.MsgAction:     action,
+			producer.MsgName:       name,
+			producer.MsgSize:       producer.FormatFileSize(torrent.Length),
+			producer.MsgUrl:        torrent.URL,
+			producer.MsgFileCount:  len(torrent.Files),
+			producer.MsgMeta:       torrent.Meta,
+			producer.MsgNewIndexes: newIndexes,
 		}); err == nil {
 			tg.sendMsgToMobs(msg, torrent.Image)
 		} else {
@@ -347,13 +347,13 @@ func (tg Notifier) Notify(new bool, torrent s.TorrentInfo) {
 	}
 }
 
-func (tg Notifier) NxGet(offset uint) {
+func (tg Notifier) SendNxGet(offset uint) {
 	if len(tg.Messages.Nx) == 0 {
 		logger.Warning("Nx message not set")
 	} else {
 		logger.Debugf("Notifying %d GET", offset)
-		if msg, err := notifier.FormatMessage(tg.Messages.nxTmpl, map[string]interface{}{
-			notifier.MsgIndex: offset,
+		if msg, err := producer.FormatMessage(tg.Messages.nxTmpl, map[string]interface{}{
+			producer.MsgIndex: offset,
 		}); err == nil {
 			tg.sendMsgToMobs(msg, nil)
 		} else {

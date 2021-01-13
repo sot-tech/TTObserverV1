@@ -35,7 +35,7 @@ import (
 	"github.com/op/go-logging"
 	"io/ioutil"
 	"path/filepath"
-	"sot-te.ch/TTObserverV1/notifier"
+	"sot-te.ch/TTObserverV1/producer"
 	s "sot-te.ch/TTObserverV1/shared"
 	"sync/atomic"
 )
@@ -43,7 +43,7 @@ import (
 var logger = logging.MustGetLogger("stan")
 
 func init() {
-	notifier.RegisterNotifier("stan", &Notifier{})
+	producer.RegisterNotifier("stan", &Notifier{})
 }
 
 type Notifier struct {
@@ -71,7 +71,7 @@ func (st *Notifier) reconnect(prevConn stan.Conn, cause error) {
 	}
 }
 
-func (st Notifier) New(configPath string, db *s.Database) (notifier.Notifier, error) {
+func (st Notifier) New(configPath string, db *s.Database) (producer.Notifier, error) {
 	var err error
 	n := Notifier{
 		db: db,
@@ -96,7 +96,7 @@ func (st Notifier) New(configPath string, db *s.Database) (notifier.Notifier, er
 	return n, err
 }
 
-func (st Notifier) Notify(_ bool, torrent s.TorrentInfo) {
+func (st Notifier) Send(_ bool, torrent s.TorrentInfo) {
 	var err error
 	bb := bytes.Buffer{}
 	enc := gob.NewEncoder(&bb)
@@ -123,4 +123,4 @@ func (st Notifier) Close() {
 	}
 }
 
-func (st Notifier) NxGet(uint) {}
+func (st Notifier) SendNxGet(uint) {}

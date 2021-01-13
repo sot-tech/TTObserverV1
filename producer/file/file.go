@@ -37,7 +37,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
-	"sot-te.ch/TTObserverV1/notifier"
+	"sot-te.ch/TTObserverV1/producer"
 	s "sot-te.ch/TTObserverV1/shared"
 	"strconv"
 	tmpl "text/template"
@@ -51,7 +51,7 @@ const (
 var logger = logging.MustGetLogger("file")
 
 func init() {
-	notifier.RegisterNotifier("file", &Notifier{})
+	producer.RegisterNotifier("file", &Notifier{})
 }
 
 type Notifier struct {
@@ -61,7 +61,7 @@ type Notifier struct {
 	perm         uint64
 }
 
-func (st Notifier) New(configPath string, _ *s.Database) (notifier.Notifier, error) {
+func (st Notifier) New(configPath string, _ *s.Database) (producer.Notifier, error) {
 	var err error
 	n := Notifier{}
 	var confBytes []byte
@@ -87,16 +87,16 @@ func (st Notifier) New(configPath string, _ *s.Database) (notifier.Notifier, err
 	return n, err
 }
 
-func (st Notifier) Notify(_ bool, torrent s.TorrentInfo) {
+func (st Notifier) Send(_ bool, torrent s.TorrentInfo) {
 	var err error
 	var fileName string
 	hash := sha1.New()
 	hash.Write([]byte(torrent.Name))
 
-	if fileName, err = notifier.FormatMessage(st.nameTemplate, map[string]interface{}{
-		notifier.MsgName: torrent.Name,
-		TmplId:   torrent.Id,
-		TmplHash: base64.RawURLEncoding.EncodeToString(hash.Sum(nil)),
+	if fileName, err = producer.FormatMessage(st.nameTemplate, map[string]interface{}{
+		producer.MsgName: torrent.Name,
+		TmplId:           torrent.Id,
+		TmplHash:         base64.RawURLEncoding.EncodeToString(hash.Sum(nil)),
 	}); err == nil {
 		if fileName = filepath.Clean(fileName); len(fileName) > 0 {
 			err = ioutil.WriteFile(fileName, torrent.Data, os.FileMode(st.perm))
@@ -111,4 +111,4 @@ func (st Notifier) Notify(_ bool, torrent s.TorrentInfo) {
 
 func (st Notifier) Close() {}
 
-func (st Notifier) NxGet(uint) {}
+func (st Notifier) SendNxGet(uint) {}
