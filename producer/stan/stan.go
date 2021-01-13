@@ -59,11 +59,8 @@ func (st Notifier) client() stan.Conn {
 	return st.clientStorage.Load().(stan.Conn)
 }
 
-func (st *Notifier) reconnect(prevConn stan.Conn, cause error) {
+func (st *Notifier) reconnect(_ stan.Conn, cause error) {
 	logger.Error("STAN Connection lost ", cause)
-	if err := prevConn.Close(); err != nil {
-		logger.Warning("Unable to close previous connection ", err)
-	}
 	if conn, err := stan.Connect(st.ClusterId, st.ClientId, stan.NatsURL(st.URL)); err == nil {
 		st.clientStorage.Store(conn)
 	} else {
@@ -118,8 +115,10 @@ func (st Notifier) Send(_ bool, torrent s.TorrentInfo) {
 }
 
 func (st Notifier) Close() {
-	if err := st.client().Close(); err != nil {
-		logger.Error(err)
+	if st.clientStorage != nil {
+		if err := st.client().Close(); err != nil {
+			logger.Error(err)
+		}
 	}
 }
 
