@@ -51,7 +51,7 @@ const (
 var logger = logging.MustGetLogger("file")
 
 func init() {
-	producer.RegisterNotifier("file", &Notifier{})
+	producer.RegisterProducer("file", &Notifier{})
 }
 
 type Notifier struct {

@@ -55,7 +55,7 @@ const (
 var logger = logging.MustGetLogger("tg")
 
 func init() {
-	producer.RegisterNotifier("telegram", &Notifier{})
+	producer.RegisterProducer("telegram", &Notifier{})
 }
 
 type Notifier struct {

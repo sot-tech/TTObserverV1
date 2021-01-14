@@ -45,7 +45,7 @@ import (
 var logger = logging.MustGetLogger("stan")
 
 func init() {
-	producer.RegisterNotifier("stan", &Notifier{})
+	producer.RegisterProducer("stan", &Notifier{})
 }
 
 type Notifier struct {

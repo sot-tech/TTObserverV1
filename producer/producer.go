@@ -66,7 +66,7 @@ var logger = logging.MustGetLogger("notifier")
 var producers = make(map[string]Producer)
 var producersMu sync.Mutex
 
-func RegisterNotifier(name string, n Producer) {
+func RegisterProducer(name string, n Producer) {
 	producersMu.Lock()
 	defer producersMu.Unlock()
 	if len(name) == 0 {
