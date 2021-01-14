@@ -196,13 +196,13 @@ func New(Notifiers []Config, db *tts.Database) (Announcer, error) {
 
 func (a Announcer) Send(new bool, torrent tts.TorrentInfo) {
 	for _, n := range a.notifiers {
-		n.Send(new, torrent)
+		go n.Send(new, torrent)
 	}
 }
 
 func (a Announcer) SendNxGet(offset uint) {
 	for _, n := range a.notifiers {
-		n.SendNxGet(offset)
+		go n.SendNxGet(offset)
 	}
 }
 

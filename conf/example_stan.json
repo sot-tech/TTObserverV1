@@ -2,5 +2,7 @@
 	"url": "nats://127.0.0.1:4222",
 	"clusterid": "tt",
 	"clientid": "ttobserver",
-	"subject": "tt.newtorrent"
+	"subject": "tt.newtorrent",
+	"pingsleep": 2,
+	"pingmax": 10
 }
