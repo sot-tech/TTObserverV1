@@ -38,77 +38,70 @@ import (
 	"sot-te.ch/TTObserverV1/producer"
 	s "sot-te.ch/TTObserverV1/shared"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
 var logger = logging.MustGetLogger("stan")
 
 func init() {
-	producer.RegisterProducer("stan", &Notifier{})
+	producer.RegisterFactory("stan", Notifier{})
 }
 
 type Notifier struct {
-	URL           string `json:"url"`
-	ClusterId     string `json:"clusterid"`
-	ClientId      string `json:"clientid"`
-	Subject       string `json:"subject"`
-	PingSleep     int    `json:"pingsleep"`
-	PingMax       int    `json:"pingmax"`
-	db            *s.Database
-	clientStorage *atomic.Value
-	clientMu      *sync.Mutex
-	clientOpts    []stan.Option
-}
-
-func (st Notifier) client() stan.Conn {
-	st.clientMu.Lock()
-	defer st.clientMu.Unlock()
-	return st.clientStorage.Load().(stan.Conn)
+	URL             string `json:"url"`
+	ClusterId       string `json:"clusterid"`
+	ClientId        string `json:"clientid"`
+	Subject         string `json:"subject"`
+	PingSleep       int    `json:"pingsleep"`
+	PingMax         int    `json:"pingmax"`
+	db              *s.Database
+	client          stan.Conn
+	reconnectWaiter *sync.WaitGroup
+	clientOpts      []stan.Option
 }
 
 func (st *Notifier) reconnect(_ stan.Conn, cause error) {
-	st.clientMu.Lock()
-	defer st.clientMu.Unlock()
+	st.reconnectWaiter.Add(1)
+	defer st.reconnectWaiter.Done()
 	err := cause
-	var conn stan.Conn
-	logger.Error("STAN Connection lost ", err)
+	logger.Error("STAN connection lost ", err)
 	for i := 0; i < stan.DefaultPingMaxOut && err != nil; i++ {
 		time.Sleep(stan.DefaultConnectWait)
-		if conn, err = stan.Connect(st.ClusterId, st.ClientId, st.clientOpts...);
-			err != nil {
-			logger.Error("Unable to reconnect ", err)
+		err = st.init()
+	}
+	if err != nil {
+		logger.Panic("Unable to reconnect to Stan ", err)
+	}
+}
+
+func (st *Notifier) init() error {
+	var err error
+	if len(st.ClusterId) > 0 && len(st.ClientId) > 0 && len(st.URL) > 0 {
+		if len(st.clientOpts) == 0 {
+			st.clientOpts = []stan.Option{
+				stan.NatsURL(st.URL),
+				stan.Pings(st.PingSleep, st.PingMax),
+				stan.SetConnectionLostHandler(st.reconnect),
+			}
 		}
-	}
-	if err == nil {
-		st.clientStorage.Store(conn)
+		st.client, err = stan.Connect(st.ClusterId, st.ClientId, st.clientOpts...)
 	} else {
-		logger.Panic("Unable to reconnect after wait ", err)
+		err = errors.New("required parameters not set")
 	}
+	return err
 }
 
 func (st Notifier) New(configPath string, db *s.Database) (producer.Producer, error) {
 	var err error
-	n := Notifier{
-		db:       db,
-		clientMu: &sync.Mutex{},
+	n := &Notifier{
+		db:              db,
+		reconnectWaiter: &sync.WaitGroup{},
 	}
 	var confBytes []byte
 	if confBytes, err = ioutil.ReadFile(filepath.Clean(configPath)); err == nil {
-		if err = json.Unmarshal(confBytes, &n); err == nil {
+		if err = json.Unmarshal(confBytes, n); err == nil {
 			if len(n.ClusterId) > 0 && len(n.ClientId) > 0 && len(n.URL) > 0 {
-				var conn stan.Conn
-				n.clientOpts = []stan.Option {
-					stan.NatsURL(n.URL),
-					stan.Pings(n.PingSleep, n.PingMax),
-					stan.SetConnectionLostHandler(n.reconnect),
-				}
-				if conn, err = stan.Connect(n.ClusterId, n.ClientId, n.clientOpts...); err == nil {
-					n.clientStorage = &atomic.Value{}
-					n.clientStorage.Store(conn)
-				} else {
-					logger.Error("Unable to connect ", err)
-				}
+				err = n.init()
 			} else {
 				err = errors.New("required parameters not set")
 			}
@@ -124,8 +117,10 @@ func (st Notifier) Send(_ bool, torrent s.TorrentInfo) {
 	if err = enc.Encode(torrent); err == nil {
 		err = errors.New("")
 		for i := 0; i < stan.DefaultPingMaxOut && err != nil; i++ {
-			err = st.client().Publish(st.Subject, bb.Bytes())
-			time.Sleep(stan.DefaultConnectWait)
+			st.reconnectWaiter.Wait()
+			if err = st.client.Publish(st.Subject, bb.Bytes()); err != nil {
+				time.Sleep(stan.DefaultConnectWait)
+			}
 		}
 	}
 	if err != nil {
@@ -133,12 +128,12 @@ func (st Notifier) Send(_ bool, torrent s.TorrentInfo) {
 	}
 }
 
-func (st Notifier) Close() {
-	if st.clientStorage != nil {
-		if err := st.client().Close(); err != nil {
-			logger.Error(err)
-		}
+func (st *Notifier) Close() error {
+	var err error
+	if st.client != nil {
+		err = st.client.Close()
 	}
+	return err
 }
 
 func (st Notifier) SendNxGet(uint) {}

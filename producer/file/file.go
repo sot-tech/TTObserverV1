@@ -50,10 +50,6 @@ const (
 
 var logger = logging.MustGetLogger("file")
 
-func init() {
-	producer.RegisterProducer("file", &Notifier{})
-}
-
 type Notifier struct {
 	NameTemplate string `json:"nametemplate"`
 	Permissions  string `json:"permissions"`
@@ -61,12 +57,16 @@ type Notifier struct {
 	perm         uint64
 }
 
-func (st Notifier) New(configPath string, _ *s.Database) (producer.Producer, error) {
+func init() {
+	producer.RegisterFactory("file", Notifier{})
+}
+
+func (fl Notifier) New(configPath string, _ *s.Database) (producer.Producer, error) {
 	var err error
-	n := Notifier{}
+	n := new(Notifier)
 	var confBytes []byte
 	if confBytes, err = ioutil.ReadFile(filepath.Clean(configPath)); err == nil {
-		if err = json.Unmarshal(confBytes, &n); err == nil {
+		if err = json.Unmarshal(confBytes, n); err == nil {
 			var stat os.FileInfo
 			if stat, err = os.Stat(filepath.Dir(n.NameTemplate)); err == nil {
 				if stat.IsDir() {
@@ -87,19 +87,19 @@ func (st Notifier) New(configPath string, _ *s.Database) (producer.Producer, err
 	return n, err
 }
 
-func (st Notifier) Send(_ bool, torrent s.TorrentInfo) {
+func (fl Notifier) Send(_ bool, torrent s.TorrentInfo) {
 	var err error
 	var fileName string
 	hash := sha1.New()
 	hash.Write([]byte(torrent.Name))
 
-	if fileName, err = producer.FormatMessage(st.nameTemplate, map[string]interface{}{
+	if fileName, err = producer.FormatMessage(fl.nameTemplate, map[string]interface{}{
 		producer.MsgName: torrent.Name,
 		TmplId:           torrent.Id,
 		TmplHash:         base64.RawURLEncoding.EncodeToString(hash.Sum(nil)),
 	}); err == nil {
 		if fileName = filepath.Clean(fileName); len(fileName) > 0 {
-			err = ioutil.WriteFile(fileName, torrent.Data, os.FileMode(st.perm))
+			err = ioutil.WriteFile(fileName, torrent.Data, os.FileMode(fl.perm))
 		} else {
 			err = errors.New("filename is empty")
 		}
@@ -109,6 +109,6 @@ func (st Notifier) Send(_ bool, torrent s.TorrentInfo) {
 	}
 }
 
-func (st Notifier) Close() {}
+func (fl *Notifier) Close() error {return nil}
 
-func (st Notifier) SendNxGet(uint) {}
+func (fl Notifier) SendNxGet(uint) {}

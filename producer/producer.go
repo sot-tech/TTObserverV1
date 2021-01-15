@@ -31,6 +31,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/op/go-logging"
+	"io"
 	"sort"
 	tts "sot-te.ch/TTObserverV1/shared"
 	"strconv"
@@ -50,11 +51,14 @@ const (
 	MsgNewIndexes = "newindexes"
 )
 
-type Producer interface {
+type Factory interface {
 	New(string, *tts.Database) (Producer, error)
+}
+
+type Producer interface {
 	Send(bool, tts.TorrentInfo)
 	SendNxGet(uint)
-	Close()
+	io.Closer
 }
 
 type Config struct {
@@ -63,19 +67,19 @@ type Config struct {
 }
 
 var logger = logging.MustGetLogger("notifier")
-var producers = make(map[string]Producer)
-var producersMu sync.Mutex
+var factories = make(map[string]Factory)
+var factoriesMu sync.Mutex
 
-func RegisterProducer(name string, n Producer) {
-	producersMu.Lock()
-	defer producersMu.Unlock()
+func RegisterFactory(name string, n Factory) {
+	factoriesMu.Lock()
+	defer factoriesMu.Unlock()
 	if len(name) == 0 {
 		panic("unspecified notifier name")
 	} else if n == nil {
 		panic("unspecified notifier ref instance")
 	} else {
-		logger.Debug("Registering new notifier ", name)
-		producers[name] = n
+		logger.Debug("Registering new producer ", name)
+		factories[name] = n
 	}
 }
 
@@ -170,7 +174,7 @@ func New(Notifiers []Config, db *tts.Database) (Announcer, error) {
 	}
 	if len(Notifiers) > 0 {
 		for i, n := range Notifiers {
-			if ni := producers[n.Type]; ni != nil {
+			if ni := factories[n.Type]; ni != nil {
 				var nn Producer
 				logger.Debug("Initiating new notifier ", n.Type)
 				if nn, err = ni.New(n.ConfigPath, db); err == nil {
@@ -208,6 +212,8 @@ func (a Announcer) SendNxGet(offset uint) {
 
 func (a *Announcer) Close() {
 	for _, n := range a.notifiers {
-		n.Close()
+		if err := n.Close(); err != nil{
+			logger.Warning(err)
+		}
 	}
 }

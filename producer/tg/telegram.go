@@ -55,7 +55,7 @@ const (
 var logger = logging.MustGetLogger("tg")
 
 func init() {
-	producer.RegisterProducer("telegram", &Notifier{})
+	producer.RegisterFactory("telegram", Notifier{})
 }
 
 type Notifier struct {
@@ -85,7 +85,7 @@ type Notifier struct {
 	client *mt.Telegram
 }
 
-func (tg *Notifier) getChats(chat int64, admins bool) error {
+func (tg Notifier) getChats(chat int64, admins bool) error {
 	var err error
 	var resp string
 	var isAdmin bool
@@ -125,7 +125,7 @@ func (tg *Notifier) getChats(chat int64, admins bool) error {
 	return err
 }
 
-func (tg *Notifier) getState(chat int64) (string, error) {
+func (tg Notifier) getState(chat int64) (string, error) {
 	var err error
 	var isMob, isAdmin bool
 	var index uint
@@ -145,7 +145,7 @@ func (tg *Notifier) getState(chat int64) (string, error) {
 	})
 }
 
-func (tg *Notifier) getReleases(chat int64, args string) error {
+func (tg Notifier) getReleases(chat int64, args string) error {
 	var err error
 	var isAdmin bool
 	if isAdmin, err = tg.db.GetAdminExist(chat); isAdmin {
@@ -173,7 +173,7 @@ func (tg *Notifier) getReleases(chat int64, args string) error {
 	return err
 }
 
-func (tg *Notifier) uploadPoster(chat int64, args string) error {
+func (tg Notifier) uploadPoster(chat int64, args string) error {
 	var err error
 	var isAdmin bool
 	if isAdmin, err = tg.db.GetAdminExist(chat); isAdmin {
@@ -264,7 +264,7 @@ func (tg *Notifier) initTg() error {
 	return err
 }
 
-func (tg *Notifier) sendMsgToMobs(msg string, photo []byte) {
+func (tg Notifier) sendMsgToMobs(msg string, photo []byte) {
 	var chats []int64
 	var err error
 	if chats, err = tg.db.GetChats(); err != nil {
@@ -297,12 +297,12 @@ func (tg *Notifier) sendMsgToMobs(msg string, photo []byte) {
 
 func (tg Notifier) New(configPath string, db *s.Database) (producer.Producer, error) {
 	var err error
-	n := Notifier{
+	n := &Notifier{
 		db: db,
 	}
 	var confBytes []byte
 	if confBytes, err = ioutil.ReadFile(filepath.Clean(configPath)); err == nil {
-		if err = json.Unmarshal(confBytes, &n); err == nil {
+		if err = json.Unmarshal(confBytes, n); err == nil {
 			if err = n.initTg(); err == nil {
 				go n.client.HandleUpdates()
 			}
@@ -362,6 +362,7 @@ func (tg Notifier) SendNxGet(offset uint) {
 	}
 }
 
-func (tg Notifier) Close() {
+func (tg *Notifier) Close() error {
 	tg.client.Close()
+	return nil
 }
