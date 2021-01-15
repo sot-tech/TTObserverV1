@@ -109,6 +109,6 @@ func (fl Notifier) Send(_ bool, torrent s.TorrentInfo) {
 	}
 }
 
-func (fl *Notifier) Close() error {return nil}
+func (fl *Notifier) Close() {}
 
 func (fl Notifier) SendNxGet(uint) {}

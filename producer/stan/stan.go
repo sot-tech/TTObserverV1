@@ -128,12 +128,12 @@ func (st Notifier) Send(_ bool, torrent s.TorrentInfo) {
 	}
 }
 
-func (st *Notifier) Close() error {
-	var err error
+func (st *Notifier) Close() {
 	if st.client != nil {
-		err = st.client.Close()
+		if err := st.client.Close(); err != nil{
+			logger.Warning(err)
+		}
 	}
-	return err
 }
 
 func (st Notifier) SendNxGet(uint) {}

@@ -31,7 +31,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/op/go-logging"
-	"io"
 	"sort"
 	tts "sot-te.ch/TTObserverV1/shared"
 	"strconv"
@@ -58,7 +57,7 @@ type Factory interface {
 type Producer interface {
 	Send(bool, tts.TorrentInfo)
 	SendNxGet(uint)
-	io.Closer
+	Close()
 }
 
 type Config struct {
@@ -212,8 +211,6 @@ func (a Announcer) SendNxGet(offset uint) {
 
 func (a *Announcer) Close() {
 	for _, n := range a.notifiers {
-		if err := n.Close(); err != nil{
-			logger.Warning(err)
-		}
+		n.Close()
 	}
 }

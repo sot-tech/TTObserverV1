@@ -267,6 +267,4 @@ func (vk Notifier) SendNxGet(offset uint) {
 	}
 }
 
-func (vk *Notifier) Close() error {
-	return nil
-}
+func (vk *Notifier) Close() {}

@@ -107,8 +107,6 @@ func (cr *Observer) Init() error {
 }
 
 func (cr *Observer) Engage() {
-	defer cr.db.Close()
-	defer cr.announcer.Close()
 	var err error
 	var nextOffset uint
 	if nextOffset, err = cr.db.GetCrawlOffset(); err == nil {
@@ -132,6 +130,11 @@ func (cr *Observer) Engage() {
 	} else {
 		logger.Fatal(err)
 	}
+}
+
+func (cr *Observer) Close(){
+	cr.announcer.Close()
+	cr.db.Close()
 }
 
 func (cr Observer) CheckTorrent(offset uint) bool {

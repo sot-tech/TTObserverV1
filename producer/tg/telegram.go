@@ -362,7 +362,6 @@ func (tg Notifier) SendNxGet(offset uint) {
 	}
 }
 
-func (tg *Notifier) Close() error {
+func (tg *Notifier) Close() {
 	tg.client.Close()
-	return nil
 }
