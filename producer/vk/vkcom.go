@@ -54,7 +54,7 @@ var isEmptyRegexp = regexp.MustCompile("^$")
 var allSpacesRegexp = regexp.MustCompile(`(?m)\s`)
 
 func init() {
-	producer.RegisterProducer("vkcom", &Notifier{})
+	producer.RegisterFactory("vkcom", &Notifier{})
 }
 
 type Notifier struct {

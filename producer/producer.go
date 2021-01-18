@@ -1,6 +1,6 @@
 /*
  * BSD-3-Clause
- * Copyright 2020 sot (aka PR_713, C_rho_272)
+ * Copyright 2021 sot (aka PR_713, C_rho_272)
  * Redistribution and use in source and binary forms, with or without modification,
  * are permitted provided that the following conditions are met:
  * 1. Redistributions of source code must retain the above copyright notice,
@@ -27,187 +27,38 @@
 package producer
 
 import (
-	"bytes"
-	"errors"
-	"fmt"
-	"github.com/op/go-logging"
-	"sort"
 	tts "sot-te.ch/TTObserverV1/shared"
-	"strconv"
-	"strings"
 	"sync"
-	"text/template"
-)
-
-const (
-	MsgAction     = "action"
-	MsgName       = "name"
-	MsgSize       = "size"
-	MsgUrl        = "url"
-	MsgIndex      = "index"
-	MsgFileCount  = "filecount"
-	MsgMeta       = "meta"
-	MsgNewIndexes = "newindexes"
 )
 
 type Producer interface {
-	New(string, *tts.Database) (Producer, error)
 	Send(bool, tts.TorrentInfo)
 	SendNxGet(uint)
 	Close()
 }
 
+type Factory interface {
+	New(string, *tts.Database) (Producer, error)
+}
+
 type Config struct {
+	Id         string `json:"id"`
 	Type       string `json:"type"`
 	ConfigPath string `json:"configpath"`
 }
 
-var logger = logging.MustGetLogger("notifier")
-var producers = make(map[string]Producer)
-var producersMu sync.Mutex
+var factories = make(map[string]Factory)
+var factoriesMu sync.Mutex
 
-func RegisterProducer(name string, n Producer) {
-	producersMu.Lock()
-	defer producersMu.Unlock()
+func RegisterFactory(name string, n Factory) {
+	factoriesMu.Lock()
+	defer factoriesMu.Unlock()
 	if len(name) == 0 {
 		panic("unspecified notifier name")
 	} else if n == nil {
 		panic("unspecified notifier ref instance")
 	} else {
 		logger.Debug("Registering new notifier ", name)
-		producers[name] = n
-	}
-}
-
-func FormatMessage(tmpl *template.Template, values map[string]interface{}) (string, error) {
-	var err error
-	var res string
-	if tmpl != nil {
-		buf := bytes.Buffer{}
-		if err = tmpl.Execute(&buf, values); err == nil {
-			res = buf.String()
-		}
-	} else {
-		err = errors.New("template not initiated")
-	}
-	return res, err
-}
-
-func FormatFileSize(size uint64) string {
-	const base = 1024
-	const suff = "KMGTPEZY"
-	var res string
-	if size < base {
-		res = fmt.Sprintf("%d B", size)
-	} else {
-		d, e := uint64(base), 0
-		for n := size / base; n >= base; n /= base {
-			d *= base
-			e++
-		}
-		s := '?'
-		if e < len(suff) {
-			s = rune(suff[e])
-		}
-		res = fmt.Sprintf("%.2f %ciB", float64(size)/float64(d), s)
-	}
-	return res
-}
-
-func GetNewFilesIndexes(files map[string]bool) []int {
-	indexes := make([]int, 0, len(files))
-	if len(files) > 0 {
-		paths := make([]string, 0, len(files))
-		for k := range files {
-			paths = append(paths, k)
-		}
-		sort.Strings(paths)
-		for i, path := range paths {
-			if files[path] {
-				indexes = append(indexes, i+1)
-			}
-		}
-	}
-	return indexes
-}
-
-func FormatIndexesMessage(idxs []int, singleMsgTmpl, mulMsgTmpl *template.Template, placeholder string) (string, error) {
-	var err error
-	var msg string
-	if len(idxs) > 0 {
-		var tmpl *template.Template
-		if len(idxs) == 1 {
-			tmpl = singleMsgTmpl
-		} else {
-			tmpl = mulMsgTmpl
-		}
-		sb := strings.Builder{}
-		isFirst := true
-		for _, i := range idxs {
-			if !isFirst {
-				sb.WriteString(", ")
-			}
-			isFirst = false
-			sb.WriteString(strconv.Itoa(i))
-		}
-		msg, err = FormatMessage(tmpl, map[string]interface{}{
-			placeholder: sb.String(),
-		})
-	}
-	return msg, err
-}
-
-type Announcer struct {
-	notifiers []Producer
-	db        *tts.Database
-}
-
-func New(Notifiers []Config, db *tts.Database) (Announcer, error) {
-	var err error
-	a := Announcer{
-		notifiers: make([]Producer, 0),
-		db:        db,
-	}
-	if len(Notifiers) > 0 {
-		for i, n := range Notifiers {
-			if ni := producers[n.Type]; ni != nil {
-				var nn Producer
-				logger.Debug("Initiating new notifier ", n.Type)
-				if nn, err = ni.New(n.ConfigPath, db); err == nil {
-					if nn != nil {
-						a.notifiers = append(a.notifiers, nn)
-					} else {
-						err = errors.New(fmt.Sprint("unable to construct notifier #", i, " type: ", n.Type))
-					}
-				}
-			} else {
-				err = errors.New(fmt.Sprint("notifier #", i, " unknown type: ", n.Type))
-			}
-			if err != nil {
-				logger.Error(err)
-				break
-			}
-		}
-	} else {
-		logger.Warning("No notifiers specified")
-	}
-	return a, err
-}
-
-func (a Announcer) Send(new bool, torrent tts.TorrentInfo) {
-	for _, n := range a.notifiers {
-		go n.Send(new, torrent)
-	}
-}
-
-func (a Announcer) SendNxGet(offset uint) {
-	for _, n := range a.notifiers {
-		go n.SendNxGet(offset)
-	}
-}
-
-func (a *Announcer) Close() {
-	for _, n := range a.notifiers {
-		n.Close()
+		factories[name] = n
 	}
 }

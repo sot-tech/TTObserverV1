@@ -44,18 +44,22 @@
 	},
 	"producers": [
 		{
+			"id": "tg",
 			"type": "telegram",
 			"configpath": "conf/example_tg.json"
 		},
 		{
+			"id":"vk",
 			"type": "vkcom",
 			"configpath": "conf/example_vk.json"
 		},
 		{
+			"id": "file",
 			"type": "file",
 			"configpath": "conf/example_file.json"
 		},
 		{
+			"id": "stan",
 			"type": "stan",
 			"configpath": "conf/example_stan.json"
 		}
