@@ -32,7 +32,9 @@ import (
 	"github.com/nfnt/resize"
 	"github.com/zeebo/bencode"
 	"image"
+	_ "image/gif"
 	"image/jpeg"
+	_ "image/png"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
@@ -81,8 +83,8 @@ type Torrent struct {
 	} `bencode:"info"`
 }
 
-func GetTorrent(url string) (*TorrentInfo, error) {
-	var res *TorrentInfo
+func GetTorrent(url string) (TorrentInfo, error) {
+	var res TorrentInfo
 	var err error
 	var data []byte
 	if resp, httpErr := http.Get(url); httpErr == nil && resp != nil && resp.StatusCode < 400 {
@@ -96,7 +98,7 @@ func GetTorrent(url string) (*TorrentInfo, error) {
 		byteBuffer := bytes.Buffer{}
 		byteBuffer.Write(data)
 		if err = bencode.NewDecoder(&byteBuffer).Decode(&torrent); err == nil {
-			res = &TorrentInfo{
+			res = TorrentInfo{
 				Name:  torrent.Info.Name,
 				URL:   torrent.PublisherUrl,
 				Files: make(map[string]bool),

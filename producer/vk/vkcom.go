@@ -54,7 +54,7 @@ var isEmptyRegexp = regexp.MustCompile("^$")
 var allSpacesRegexp = regexp.MustCompile(`(?m)\s`)
 
 func init() {
-	producer.RegisterFactory("vkcom", &Notifier{})
+	producer.RegisterFactory("vkcom", Notifier{})
 }
 
 type Notifier struct {
@@ -85,12 +85,10 @@ type Notifier struct {
 
 func (vk Notifier) New(configPath string, db *s.Database) (producer.Producer, error) {
 	var err error
-	n := Notifier{
-		db: db,
-	}
+	n := &Notifier{db: db}
 	var confBytes []byte
 	if confBytes, err = ioutil.ReadFile(filepath.Clean(configPath)); err == nil {
-		if err = json.Unmarshal(confBytes, &n); err == nil {
+		if err = json.Unmarshal(confBytes, n); err == nil {
 			if len(n.Token) > 0 {
 				if len(n.IgnoreRegexp) == 0 {
 					n.ignorePattern = isEmptyRegexp //is empty
@@ -153,38 +151,31 @@ func (vk Notifier) uploadImage(photo []byte, groupId uint) (string, error) {
 }
 
 func (vk Notifier) buildHashTags(meta map[string]string) string {
-	sb := strings.Builder{}
+	tags := strings.Builder{}
 	if len(meta) > 0 && len(vk.Messages.Tags) > 0 {
-		for tag, multivalued := range vk.Messages.Tags {
+		for tag, multival := range vk.Messages.Tags {
 			m := meta[tag]
 			if len(m) > 0 {
-				if multivalued {
-					for _, mPart := range strings.Split(m, vk.Messages.TagsSeparator) {
-						mPart = strings.TrimSpace(mPart)
-						if len(mPart) > 0 {
-							mPart = nonLetterNumberSpaceRegexp.ReplaceAllString(mPart, "")
-							mPart = allSpacesRegexp.ReplaceAllString(mPart, "_")
-							if len(mPart) > 0 {
-								sb.WriteRune('#')
-								sb.WriteString(mPart)
-								sb.WriteRune(' ')
-							}
-						}
+				writeTag := func(s string) {
+					s = strings.TrimSpace(s)
+					if len(s) > 0 {
+						s = nonLetterNumberSpaceRegexp.ReplaceAllString(s, "")
+						tags.WriteRune('#')
+						tags.WriteString(allSpacesRegexp.ReplaceAllString(s, "_"))
+						tags.WriteRune(' ')
+					}
+				}
+				if multival {
+					for _, e := range strings.Split(m, vk.Messages.TagsSeparator) {
+						writeTag(e)
 					}
 				} else {
-					m = strings.TrimSpace(m)
-					m = nonLetterNumberSpaceRegexp.ReplaceAllString(m, "")
-					m = allSpacesRegexp.ReplaceAllString(m, "_")
-					if len(m) > 0 {
-						sb.WriteRune('#')
-						sb.WriteString(m)
-						sb.WriteRune(' ')
-					}
+					writeTag(m)
 				}
 			}
 		}
 	}
-	return sb.String()
+	return tags.String()
 }
 
 func (vk Notifier) Send(isNew bool, torrent s.TorrentInfo) {
@@ -274,4 +265,4 @@ func (vk Notifier) SendNxGet(offset uint) {
 	}
 }
 
-func (vk Notifier) Close() {}
+func (vk *Notifier) Close() {}

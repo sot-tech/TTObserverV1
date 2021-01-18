@@ -30,6 +30,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/op/go-logging"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,6 +47,8 @@ const (
 	MsgMeta       = "meta"
 	MsgNewIndexes = "newindexes"
 )
+
+var logger = logging.MustGetLogger("notifier")
 
 func FormatMessage(tmpl *template.Template, values map[string]interface{}) (string, error) {
 	var err error

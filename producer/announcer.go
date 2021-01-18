@@ -29,11 +29,8 @@ package producer
 import (
 	"errors"
 	"fmt"
-	"github.com/op/go-logging"
 	tts "sot-te.ch/TTObserverV1/shared"
 )
-
-var logger = logging.MustGetLogger("announcer")
 
 type Announcer struct {
 	producers []Producer

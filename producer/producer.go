@@ -31,6 +31,12 @@ import (
 	"sync"
 )
 
+type Config struct {
+	Id         string `json:"id"`
+	Type       string `json:"type"`
+	ConfigPath string `json:"configpath"`
+}
+
 type Producer interface {
 	Send(bool, tts.TorrentInfo)
 	SendNxGet(uint)
@@ -39,12 +45,6 @@ type Producer interface {
 
 type Factory interface {
 	New(string, *tts.Database) (Producer, error)
-}
-
-type Config struct {
-	Id         string `json:"id"`
-	Type       string `json:"type"`
-	ConfigPath string `json:"configpath"`
 }
 
 var factories = make(map[string]Factory)
@@ -58,7 +58,7 @@ func RegisterFactory(name string, n Factory) {
 	} else if n == nil {
 		panic("unspecified notifier ref instance")
 	} else {
-		logger.Debug("Registering new notifier ", name)
+		logger.Debug("Registering new producer ", name)
 		factories[name] = n
 	}
 }
