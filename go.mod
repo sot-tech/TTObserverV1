@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/azzzak/vkapi v0.0.0-20190905132831-5fc550e1c8f4
 	github.com/golang/protobuf v1.4.3 // indirect
-	github.com/mattn/go-sqlite3 v2.0.3+incompatible
+	github.com/mattn/go-sqlite3 v1.14.6
 	github.com/nats-io/nats-streaming-server v0.20.0 // indirect
 	github.com/nats-io/stan.go v0.8.2
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
