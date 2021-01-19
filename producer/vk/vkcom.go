@@ -63,7 +63,7 @@ type Notifier struct {
 	GroupIds        []uint `json:"groupids"`
 	IgnoreUnchanged bool   `json:"ignoreunchanged"`
 	IgnoreRegexp    string `json:"ignoreregexp"`
-	Messages        struct {
+	Messages        *struct {
 		Announce            string `json:"announce"`
 		announceTmpl        *tmpl.Template
 		Nx                  string `json:"n1x"`
@@ -83,7 +83,7 @@ type Notifier struct {
 	db            *s.Database
 }
 
-func (vk Notifier) New(configPath string, db *s.Database) (producer.Producer, error) {
+func (_ Notifier) New(configPath string, db *s.Database) (producer.Producer, error) {
 	var err error
 	n := &Notifier{db: db}
 	var confBytes []byte
@@ -265,4 +265,4 @@ func (vk Notifier) SendNxGet(offset uint) {
 	}
 }
 
-func (vk *Notifier) Close() {}
+func (_ Notifier) Close() {}

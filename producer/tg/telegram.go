@@ -58,31 +58,35 @@ func init() {
 	producer.RegisterFactory("telegram", Notifier{})
 }
 
+type messageTemplates struct {
+	state           *tmpl.Template
+	announce        *tmpl.Template
+	nx              *tmpl.Template
+	singleIndex     *tmpl.Template
+	multipleIndexes *tmpl.Template
+}
+
 type Notifier struct {
 	ApiId     int32  `json:"apiid"`
 	ApiHash   string `json:"apihash"`
 	BotToken  string `json:"bottoken"`
 	DBPath    string `json:"dbpath"`
 	FileStore string `json:"filestorepath"`
-	OTPSeed   string `json:"otpseed"`
+	OTPSeed   string `json:"otpseed,omitempty"`
 	Messages  struct {
 		mt.TGMessages
-		State               string `json:"state"`
-		stateTmpl           *tmpl.Template
-		Announce            string `json:"announce"`
-		announceTmpl        *tmpl.Template
-		Nx                  string `json:"n1x"`
-		nxTmpl              *tmpl.Template
-		Replacements        map[string]string `json:"replacements"`
-		Added               string            `json:"added"`
-		Updated             string            `json:"updated"`
-		SingleIndex         string            `json:"singleindex"`
-		singleIndexTmpl     *tmpl.Template
-		MultipleIndexes     string `json:"multipleindexes"`
-		multipleIndexesTmpl *tmpl.Template
+		State           string            `json:"state"`
+		Announce        string            `json:"announce,omitempty"`
+		Nx              string            `json:"n1x,omitempty"`
+		Replacements    map[string]string `json:"replacements"`
+		Added           string            `json:"added,omitempty"`
+		Updated         string            `json:"updated,omitempty"`
+		SingleIndex     string            `json:"singleindex,omitempty"`
+		MultipleIndexes string            `json:"multipleindexes,omitempty"`
 	} `json:"msg"`
-	db     *s.Database
-	client *mt.Telegram
+	messages *messageTemplates
+	db       *s.Database
+	client   *mt.Telegram
 }
 
 func (tg Notifier) getChats(chat int64, admins bool) error {
@@ -138,7 +142,7 @@ func (tg Notifier) getState(chat int64) (string, error) {
 	if index, err = tg.db.GetCrawlOffset(); err != nil {
 		return "", err
 	}
-	return producer.FormatMessage(tg.Messages.stateTmpl, map[string]interface{}{
+	return producer.FormatMessage(tg.messages.state, map[string]interface{}{
 		msgWatch:          isMob,
 		msgAdmin:          isAdmin,
 		producer.MsgIndex: index,
@@ -207,11 +211,12 @@ func (tg Notifier) uploadPoster(chat int64, args string) error {
 	return err
 }
 
-func (tg *Notifier) initTg() error {
+func (tg *Notifier) init() error {
 	var err error
-	telegram := mt.New(tg.ApiId, tg.ApiHash, tg.DBPath, tg.FileStore, tg.OTPSeed)
-	telegram.Messages = tg.Messages.TGMessages
-	telegram.BackendFunctions = mt.TGBackendFunction{
+	tg.client = mt.New(tg.ApiId, tg.ApiHash, tg.DBPath, tg.FileStore, tg.OTPSeed)
+	tg.messages = new(messageTemplates)
+	tg.client.Messages = tg.Messages.TGMessages
+	tg.client.BackendFunctions = mt.TGBackendFunction{
 		GetOffset:  tg.db.GetTgOffset,
 		SetOffset:  tg.db.UpdateTgOffset,
 		ChatExist:  tg.db.GetChatExist,
@@ -222,8 +227,7 @@ func (tg *Notifier) initTg() error {
 		AdminRm:    tg.db.DelAdmin,
 		State:      tg.getState,
 	}
-	if err = telegram.LoginAsBot(tg.BotToken, mt.MtLogWarning); err == nil {
-		tg.client = telegram
+	if err = tg.client.LoginAsBot(tg.BotToken, mt.MtLogWarning); err == nil {
 		var subErr error
 		if subErr = tg.client.AddCommand(cmdLsChats, func(chat int64, _, _ string) error {
 			return tg.getChats(chat, false)
@@ -245,19 +249,19 @@ func (tg *Notifier) initTg() error {
 		}); subErr != nil {
 			logger.Error(subErr)
 		}
-		if tg.Messages.announceTmpl, subErr = tmpl.New("announce").Parse(tg.Messages.Announce); subErr != nil {
+		if tg.messages.announce, subErr = tmpl.New("announce").Parse(tg.Messages.Announce); subErr != nil {
 			logger.Error(subErr)
 		}
-		if tg.Messages.stateTmpl, subErr = tmpl.New("state").Parse(tg.Messages.State); subErr != nil {
+		if tg.messages.state, subErr = tmpl.New("state").Parse(tg.Messages.State); subErr != nil {
 			logger.Error(subErr)
 		}
-		if tg.Messages.nxTmpl, subErr = tmpl.New("n1000").Parse(tg.Messages.Nx); subErr != nil {
+		if tg.messages.nx, subErr = tmpl.New("n1000").Parse(tg.Messages.Nx); subErr != nil {
 			logger.Error(subErr)
 		}
-		if tg.Messages.singleIndexTmpl, subErr = tmpl.New("singleIndex").Parse(tg.Messages.SingleIndex); subErr != nil {
+		if tg.messages.singleIndex, subErr = tmpl.New("singleIndex").Parse(tg.Messages.SingleIndex); subErr != nil {
 			logger.Error(subErr)
 		}
-		if tg.Messages.multipleIndexesTmpl, subErr = tmpl.New("multipleIndexes").Parse(tg.Messages.MultipleIndexes); subErr != nil {
+		if tg.messages.multipleIndexes, subErr = tmpl.New("multipleIndexes").Parse(tg.Messages.MultipleIndexes); subErr != nil {
 			logger.Error(subErr)
 		}
 	}
@@ -295,13 +299,13 @@ func (tg Notifier) sendMsgToMobs(msg string, photo []byte) {
 	}
 }
 
-func (tg Notifier) New(configPath string, db *s.Database) (producer.Producer, error) {
+func (_ Notifier) New(configPath string, db *s.Database) (producer.Producer, error) {
 	var err error
 	n := &Notifier{db: db}
 	var confBytes []byte
 	if confBytes, err = ioutil.ReadFile(filepath.Clean(configPath)); err == nil {
 		if err = json.Unmarshal(confBytes, n); err == nil {
-			if err = n.initTg(); err == nil {
+			if err = n.init(); err == nil {
 				go n.client.HandleUpdates()
 			}
 		}
@@ -324,12 +328,12 @@ func (tg Notifier) Send(new bool, torrent s.TorrentInfo) {
 				name = strings.Replace(name, k, v, -1)
 			}
 		}
-		newIndexes, err := producer.FormatIndexesMessage(producer.GetNewFilesIndexes(torrent.Files), tg.Messages.singleIndexTmpl,
-			tg.Messages.multipleIndexesTmpl, producer.MsgNewIndexes)
+		newIndexes, err := producer.FormatIndexesMessage(producer.GetNewFilesIndexes(torrent.Files), tg.messages.singleIndex,
+			tg.messages.multipleIndexes, producer.MsgNewIndexes)
 		if err != nil {
 			logger.Error(err)
 		}
-		if msg, err := producer.FormatMessage(tg.Messages.announceTmpl, map[string]interface{}{
+		if msg, err := producer.FormatMessage(tg.messages.announce, map[string]interface{}{
 			producer.MsgAction:     action,
 			producer.MsgName:       name,
 			producer.MsgSize:       producer.FormatFileSize(torrent.Length),
@@ -350,7 +354,7 @@ func (tg Notifier) SendNxGet(offset uint) {
 		logger.Warning("Nx message not set")
 	} else {
 		logger.Debugf("Notifying %d GET", offset)
-		if msg, err := producer.FormatMessage(tg.Messages.nxTmpl, map[string]interface{}{
+		if msg, err := producer.FormatMessage(tg.messages.nx, map[string]interface{}{
 			producer.MsgIndex: offset,
 		}); err == nil {
 			tg.sendMsgToMobs(msg, nil)

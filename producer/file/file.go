@@ -61,7 +61,7 @@ type Notifier struct {
 	perm         uint64
 }
 
-func (fl Notifier) New(configPath string, _ *s.Database) (producer.Producer, error) {
+func (_ Notifier) New(configPath string, _ *s.Database) (producer.Producer, error) {
 	var err error
 	n := new(Notifier)
 	var confBytes []byte
@@ -109,6 +109,6 @@ func (fl Notifier) Send(_ bool, torrent s.TorrentInfo) {
 	}
 }
 
-func (fl *Notifier) Close() {}
+func (_ Notifier) Close() {}
 
-func (fl Notifier) SendNxGet(uint) {}
+func (_ Notifier) SendNxGet(uint) {}
