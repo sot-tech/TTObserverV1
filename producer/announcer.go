@@ -39,9 +39,9 @@ type Announcer struct {
 
 var producers = make(map[string]Producer)
 
-func New(configs []Config, db *tts.Database) (Announcer, error) {
+func New(configs []Config, db *tts.Database) (*Announcer, error) {
 	var err error
-	a := Announcer{
+	a := &Announcer{
 		producers: make([]Producer, 0),
 		db:        db,
 	}

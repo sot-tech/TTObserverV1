@@ -65,7 +65,7 @@ type Observer struct {
 	Producers []producer.Config `json:"producers"`
 	DBFile    string            `json:"dbfile"`
 	db        *s.Database
-	announcer producer.Announcer
+	producer  *producer.Announcer
 }
 
 var logger = logging.MustGetLogger("observer")
@@ -99,7 +99,7 @@ func (cr *Observer) Init() error {
 	var err error
 	logger.Debug("Initiating notifiers")
 	if len(cr.Producers) > 0 {
-		cr.announcer, err = producer.New(cr.Producers, db)
+		cr.producer, err = producer.New(cr.Producers, db)
 	} else {
 		logger.Warning("notifiers not set")
 	}
@@ -133,7 +133,7 @@ func (cr *Observer) Engage() {
 }
 
 func (cr *Observer) Close(){
-	cr.announcer.Close()
+	cr.producer.Close()
 	cr.db.Close()
 }
 
@@ -171,7 +171,7 @@ func (cr Observer) CheckTorrent(offset uint) bool {
 			torrent.Id = torrentId
 			cr.Notify(torrent, fullContext, isNew)
 			if offset > 0 && offset%cr.Crawler.Anniversary == 0 {
-				cr.announcer.SendNxGet(offset)
+				cr.producer.SendNxGet(offset)
 			}
 			res = true
 		} else {
@@ -238,5 +238,5 @@ func (cr Observer) Notify(torrent s.TorrentInfo, context string, isNew bool) {
 	torrent.Meta = upstreamMeta
 	torrent.Image = torrentImage
 	torrent.URL = cr.Crawler.BaseURL + context
-	cr.announcer.Send(isNew, torrent)
+	cr.producer.Send(isNew, torrent)
 }
