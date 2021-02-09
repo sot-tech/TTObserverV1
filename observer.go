@@ -98,11 +98,7 @@ func (cr *Observer) Init() error {
 	}
 	var err error
 	logger.Debug("Initiating notifiers")
-	if len(cr.Producers) > 0 {
-		cr.producer, err = producer.New(cr.Producers, db)
-	} else {
-		logger.Warning("notifiers not set")
-	}
+	cr.producer, err = producer.New(cr.Producers, db)
 	return err
 }
 
