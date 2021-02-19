@@ -30,6 +30,8 @@ import (
 	"flag"
 	"github.com/op/go-logging"
 	"io"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"sot-te.ch/TTObserverV1"
@@ -47,7 +49,6 @@ func main() {
 	if err != nil {
 		logger.Fatal(err)
 	}
-
 	var outputWriter io.Writer
 	if tt.Log.File == "" {
 		outputWriter = os.Stdout
@@ -71,12 +72,23 @@ func main() {
 	}
 
 	if err = tt.Init(); err == nil {
-		go tt.Engage()
-		defer tt.Close()
 		ch := make(chan os.Signal, 2)
+		go func() {
+			tt.Engage()
+			ch <- syscall.SIGABRT
+		}()
+		defer tt.Close()
+		go func() {
+			if err := http.ListenAndServe("localhost:10080", nil); err != nil {
+				logger.Error(err)
+			}
+		}()
 		signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
-		<-ch
-	} else{
+		sig := <-ch
+		if sig == syscall.SIGABRT {
+			os.Exit(1)
+		}
+	} else {
 		println(err)
 	}
 }
