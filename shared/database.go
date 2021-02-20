@@ -113,7 +113,7 @@ func (db Database) execNoResult(query string, args ...interface{}) error {
 }
 
 func (db Database) getIntArray(query string, args ...interface{}) ([]int64, error) {
-	var arr []int64
+	arr := make([]int64, 0)
 	var err error
 	err = db.checkConnection()
 	if err == nil {
@@ -205,7 +205,7 @@ func (tr DBTorrent) String() string {
 }
 
 func (db Database) GetTorrents(pattern string) ([]DBTorrent, error) {
-	var torrents []DBTorrent
+	torrents := make([]DBTorrent, 0)
 	var err error
 	if err = db.checkConnection(); err == nil {
 		var rows *sql.Rows
@@ -247,7 +247,7 @@ func (tr DBTorrentFile) String() string {
 
 func (db Database) getTorrentFilesQuery(query string, args ...interface{}) ([]DBTorrentFile, error) {
 	var err error
-	var files []DBTorrentFile
+	files := make([]DBTorrentFile, 0)
 	err = db.checkConnection()
 	if err == nil {
 		var rows *sql.Rows
@@ -365,7 +365,7 @@ func (db Database) AddTorrentMeta(id int64, meta map[string]string) error {
 
 func (db Database) GetTorrentImage(id int64) ([]byte, error) {
 	var err error
-	var image []byte
+	image := make([]byte, 0)
 	err = db.checkConnection()
 	if err == nil {
 		var rows *sql.Rows
