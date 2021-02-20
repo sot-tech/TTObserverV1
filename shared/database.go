@@ -390,7 +390,7 @@ func (db Database) AddTorrentImage(id int64, image []byte) error {
 	return db.execNoResult(insertTorrentImage, image, id)
 }
 
-func New(path string) (*Database, error) {
+func ConnectDB(path string) (*Database, error) {
 	var err error
 	var db Database
 	db.con, err = sql.Open(DBDriver, path)

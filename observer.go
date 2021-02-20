@@ -82,7 +82,7 @@ func ReadConfig(path string) (*Observer, error) {
 
 func (cr *Observer) Init() error {
 	var err error
-	if cr.db, err = s.New(cr.DBFile); err != nil {
+	if cr.db, err = s.ConnectDB(cr.DBFile); err != nil {
 		return err
 	}
 	logger.Debug("Initiating meta extractor")
