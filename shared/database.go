@@ -200,15 +200,12 @@ type DBTorrent struct {
 	Name string
 }
 
-func (tr *DBTorrent) String() string {
-	if tr == nil {
-		return "nil"
-	}
+func (tr DBTorrent) String() string {
 	return fmt.Sprintf("Id: %d;\tName: %s", tr.Id, tr.Name)
 }
 
 func (db Database) GetTorrents(pattern string) ([]DBTorrent, error) {
-	torrents := make([]DBTorrent, 0)
+	var torrents []DBTorrent
 	var err error
 	if err = db.checkConnection(); err == nil {
 		var rows *sql.Rows
@@ -244,10 +241,7 @@ type DBTorrentFile struct {
 	Name    string
 }
 
-func (tr *DBTorrentFile) String() string {
-	if tr == nil {
-		return "nil"
-	}
+func (tr DBTorrentFile) String() string {
 	return fmt.Sprintf("Id: %d;\tName: %s", tr.Id, tr.Name)
 }
 
@@ -274,12 +268,12 @@ func (db Database) getTorrentFilesQuery(query string, args ...interface{}) ([]DB
 	return files, err
 }
 
-func (db Database) GetTorrentFile(id int64) (*DBTorrentFile, error) {
+func (db Database) GetTorrentFile(id int64) (DBTorrentFile, error) {
 	var err error
-	var file *DBTorrentFile
+	var file DBTorrentFile
 	var files []DBTorrentFile
 	if files, err = db.getTorrentFilesQuery(selectTorrentFileById, id); err == nil && len(files) > 0 {
-		file = &files[0]
+		file = files[0]
 	}
 	return file, err
 }
