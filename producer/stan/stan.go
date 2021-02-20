@@ -110,7 +110,7 @@ func (st Notifier) New(configPath string, db *s.Database) (producer.Producer, er
 	return n, err
 }
 
-func (st Notifier) Send(_ bool, torrent s.TorrentInfo) {
+func (st Notifier) Send(_ bool, torrent *s.TorrentInfo) {
 	var err error
 	bb := bytes.Buffer{}
 	enc := gob.NewEncoder(&bb)

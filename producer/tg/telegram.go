@@ -313,7 +313,7 @@ func (_ Notifier) New(configPath string, db *s.Database) (producer.Producer, err
 	return n, err
 }
 
-func (tg Notifier) Send(new bool, torrent s.TorrentInfo) {
+func (tg Notifier) Send(new bool, torrent *s.TorrentInfo) {
 	if tg.Messages.Announce == "" {
 		logger.Warning("Announce message not set")
 	} else {

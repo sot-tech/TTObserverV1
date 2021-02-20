@@ -87,7 +87,7 @@ func (_ Notifier) New(configPath string, _ *s.Database) (producer.Producer, erro
 	return n, err
 }
 
-func (fl Notifier) Send(_ bool, torrent s.TorrentInfo) {
+func (fl Notifier) Send(_ bool, torrent *s.TorrentInfo) {
 	var err error
 	var fileName string
 	hash := sha1.New()

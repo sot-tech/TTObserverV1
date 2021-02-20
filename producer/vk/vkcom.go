@@ -178,7 +178,7 @@ func (vk Notifier) buildHashTags(meta map[string]string) string {
 	return tags.String()
 }
 
-func (vk Notifier) Send(isNew bool, torrent s.TorrentInfo) {
+func (vk Notifier) Send(isNew bool, torrent *s.TorrentInfo) {
 	var err error
 	if len(vk.Messages.Announce) > 0 {
 		changedIndexes := producer.GetNewFilesIndexes(torrent.Files)

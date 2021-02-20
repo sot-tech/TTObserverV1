@@ -38,7 +38,7 @@ type Config struct {
 }
 
 type Producer interface {
-	Send(bool, tts.TorrentInfo)
+	Send(bool, *tts.TorrentInfo)
 	SendNxGet(uint)
 	Close()
 }

@@ -83,42 +83,50 @@ type Torrent struct {
 	} `bencode:"info"`
 }
 
-func GetTorrent(url string) (TorrentInfo, error) {
-	var res TorrentInfo
+func GetTorrent(url string) (*TorrentInfo, error) {
+	var res *TorrentInfo
 	var err error
-	var data []byte
-	if resp, httpErr := http.Get(url); httpErr == nil && resp != nil && resp.StatusCode < 400 {
-		defer resp.Body.Close()
-		data, err = ioutil.ReadAll(resp.Body)
-	} else {
-		err = buildError(resp, httpErr, "get torrent")
-	}
-	if err == nil {
-		var torrent Torrent
-		byteBuffer := bytes.Buffer{}
-		byteBuffer.Write(data)
-		if err = bencode.NewDecoder(&byteBuffer).Decode(&torrent); err == nil {
-			res = TorrentInfo{
-				Name:  torrent.Info.Name,
-				URL:   torrent.PublisherUrl,
-				Files: make(map[string]bool),
-				Data: data,
-			}
-			if torrent.Info.Files != nil {
-				for _, file := range torrent.Info.Files {
-					if file.Path != nil {
-						allParts := []string{torrent.Info.Name}
-						allParts = append(allParts, file.Path...)
-						res.Files["/"+filepath.Join(allParts...)] = true
+	var resp *http.Response
+	if resp, err = http.Head(url); err == nil && resp != nil {
+		resp.Close = true
+		_ = resp.Body.Close()
+		if resp.StatusCode < 400 {
+			var data []byte
+			if resp, err = http.Get(url); err == nil && resp != nil && resp.StatusCode < 400 {
+				resp.Close = true
+				defer resp.Body.Close()
+				if data, err = ioutil.ReadAll(resp.Body); err == nil {
+					var torrent Torrent
+					byteBuffer := bytes.Buffer{}
+					byteBuffer.Write(data)
+					if err = bencode.NewDecoder(&byteBuffer).Decode(&torrent); err == nil {
+						res = &TorrentInfo{
+							Name:  torrent.Info.Name,
+							URL:   torrent.PublisherUrl,
+							Files: make(map[string]bool),
+							Data:  data,
+						}
+						if torrent.Info.Files != nil {
+							for _, file := range torrent.Info.Files {
+								if file.Path != nil {
+									allParts := []string{torrent.Info.Name}
+									allParts = append(allParts, file.Path...)
+									res.Files["/"+filepath.Join(allParts...)] = true
+								}
+								res.Length += file.Length
+							}
+						} else {
+							res.Files["/"+torrent.Info.Name] = true
+							res.Length = torrent.Info.Length
+						}
 					}
-					res.Length += file.Length
 				}
 			} else {
-				res.Files["/"+torrent.Info.Name] = true
-				res.Length = torrent.Info.Length
+				err = buildError(resp, err, "get torrent")
 			}
 		}
 	}
+
 	return res, err
 }
 
@@ -127,6 +135,7 @@ func GetTorrentPoster(imageUrl string, maxSize uint) (error, []byte) {
 	var torrentImage []byte
 	if len(imageUrl) > 0 {
 		if resp, httpErr := http.Get(imageUrl); httpErr == nil && resp != nil && resp.StatusCode < 400 {
+			resp.Close = true
 			defer resp.Body.Close()
 			if maxSize > 0 {
 				var img image.Image
@@ -139,7 +148,7 @@ func GetTorrentPoster(imageUrl string, maxSize uint) (error, []byte) {
 						torrentImage, err = ioutil.ReadAll(&imgBuffer)
 					}
 				}
-			} else{
+			} else {
 				torrentImage, err = ioutil.ReadAll(resp.Body)
 			}
 
@@ -160,9 +169,13 @@ func buildError(resp *http.Response, httpErr error, desc string) error {
 	}
 	if httpErr != nil {
 		sb.WriteString(httpErr.Error())
-	} else if resp == nil {
+		sb.WriteRune(' ')
+	}
+	if resp == nil {
 		sb.WriteString("empty response")
 	} else {
+		resp.Close = true
+		_ = resp.Body.Close()
 		sb.WriteString(resp.Status)
 	}
 	return errors.New(sb.String())

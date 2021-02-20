@@ -34,6 +34,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"sot-te.ch/TTObserverV1"
 	"syscall"
 )
@@ -78,11 +79,15 @@ func main() {
 			ch <- syscall.SIGABRT
 		}()
 		defer tt.Close()
-		go func() {
-			if err := http.ListenAndServe("localhost:10080", nil); err != nil {
-				logger.Error(err)
-			}
-		}()
+		if len(args) > 1 && len(args[1]) > 0 {
+			go func() {
+				runtime.GC()
+				if err := http.ListenAndServe("localhost:" + args[1], nil); err != nil {
+					logger.Error(err)
+					ch <- syscall.SIGABRT
+				}
+			}()
+		}
 		signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
 		sig := <-ch
 		if sig == syscall.SIGABRT {
