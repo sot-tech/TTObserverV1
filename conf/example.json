@@ -41,6 +41,7 @@
 				"param": ""
 			}
 		],
+		"metaretry": 20,
 		"imagemetafield": "poster",
 		"imagethumb": 1280
 	},

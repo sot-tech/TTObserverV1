@@ -59,6 +59,7 @@ type Observer struct {
 		Threshold      uint                        `json:"threshold"`
 		Anniversary    uint                        `json:"anniversary"`
 		MetaActions    []HTExtractor.ExtractAction `json:"metaactions"`
+		MetaRetry      uint                        `json:"metaretry"`
 		ImageMetaField string                      `json:"imagemetafield"`
 		ImageThumb     uint                        `json:"imagethumb"`
 		metaExtractor  *HTExtractor.Extractor
@@ -187,8 +188,15 @@ func (cr Observer) Notify(torrent *s.TorrentInfo, context string, isNew bool) {
 		if cr.Crawler.metaExtractor != nil {
 			var rawMeta map[string][]byte
 			logger.Debug("Extracting meta for torrent ", torrent.Name)
-			if rawMeta, err = cr.Crawler.metaExtractor.ExtractData(cr.Crawler.BaseURL, context);
-				err == nil && len(rawMeta) > 0 {
+			rawMeta, err = cr.Crawler.metaExtractor.ExtractData(cr.Crawler.BaseURL, context)
+			if err != nil || len(rawMeta) == 0 {
+				logger.Error("Meta fetch error: ", err, " got meta len ", len(rawMeta))
+				if cr.Crawler.MetaRetry > 0 {
+					time.Sleep(time.Duration(cr.Crawler.MetaRetry) * time.Second)
+					rawMeta, err = cr.Crawler.metaExtractor.ExtractData(cr.Crawler.BaseURL, context)
+				}
+			}
+			if err == nil && len(rawMeta) > 0 {
 				upstreamMeta = make(map[string]string, len(rawMeta))
 				for k, v := range rawMeta {
 					if len(k) > 0 {
