@@ -72,33 +72,34 @@ func (nc *Notifier) init() error {
 			nats.MaxReconnects(nc.MaxReconnects),
 			nats.ReconnectBufSize(maxMessagesInBuffer * maxMessageSize),
 		}
-		nc.client, err = nats.Connect(nc.URL, clientOpts...)
-		if len(nc.Stream) > 0 {
-			if nc.js, err = nc.client.JetStream(); err == nil {
-				var exist bool
-				for sn := range nc.js.StreamNames() {
-					if nc.Stream == sn {
-						exist = true
-						break
+		if nc.client, err = nats.Connect(nc.URL, clientOpts...); err == nil {
+			if len(nc.Stream) > 0 {
+				if nc.js, err = nc.client.JetStream(); err == nil {
+					var exist bool
+					for sn := range nc.js.StreamNames() {
+						if nc.Stream == sn {
+							exist = true
+							break
+						}
 					}
-				}
-				logger.Debug("Checking stream ", nc.Stream, " exist: ", exist)
-				if !exist {
-					if _, err = nc.js.AddStream(&nats.StreamConfig{
-						Name:       nc.Stream,
-						Subjects:   []string{nc.Subject},
-						Retention:  nats.WorkQueuePolicy,
-						MaxAge:     maxMessageAge,
-						MaxMsgSize: maxMessageSize,
-					}); err == nil {
-						logger.Info("Created new stream: ", nc.Stream)
-					} else {
-						logger.Error("Unable to create stream: ", nc.Stream, " error: ", err)
+					logger.Debug("Checking stream ", nc.Stream, " exist: ", exist)
+					if !exist {
+						if _, err = nc.js.AddStream(&nats.StreamConfig{
+							Name:       nc.Stream,
+							Subjects:   []string{nc.Subject},
+							Retention:  nats.WorkQueuePolicy,
+							MaxAge:     maxMessageAge,
+							MaxMsgSize: maxMessageSize,
+						}); err == nil {
+							logger.Info("Created new stream: ", nc.Stream)
+						} else {
+							logger.Error("Unable to create stream: ", nc.Stream, " error: ", err)
+						}
 					}
+				} else {
+					logger.Warning("Unable to get JetStream context: ", err, " falling back to pure NATS")
+					err = nil
 				}
-			} else {
-				logger.Warning("Unable to get JetStream context: ", err, " falling back to pure NATS")
-				err = nil
 			}
 		}
 	} else {
