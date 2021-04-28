@@ -51,8 +51,8 @@ Uses:
 ## Modules
 TTObserver notifies about release only if there is at least one notifier imported in `observer.go`.
 When notifier imported, it registers itself into notifiers list and if it's type declared in
-`announcers` config list, notificator executes needed commands.
-Any notifier has it's own configuration file, so look into `notifier\*` subdirectory fot additional info. 
+`producers` config list, notificator executes needed commands.
+Any notifier has it's own configuration file, so look into `producer\*` subdirectory fot additional info. 
 
 ## Differences between V0 and V1
 1. V0 could notify about releases, but also upload torrent to remote transmission server, V1 can't (and not planned)

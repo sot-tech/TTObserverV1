@@ -1,0 +1,7 @@
+{
+	"url": "nats://127.0.0.1:4222",
+	"stream": "tt",
+	"subject": "tt.newtorrent",
+	"pinginterval": 2,
+	"maxreconnects": -1
+}

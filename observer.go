@@ -38,6 +38,7 @@ import (
 	"sot-te.ch/HTExtractor"
 	"sot-te.ch/TTObserverV1/producer"
 	_ "sot-te.ch/TTObserverV1/producer/file"
+	_ "sot-te.ch/TTObserverV1/producer/nats"
 	_ "sot-te.ch/TTObserverV1/producer/stan"
 	_ "sot-te.ch/TTObserverV1/producer/tg"
 	_ "sot-te.ch/TTObserverV1/producer/vk"
