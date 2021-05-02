@@ -124,7 +124,7 @@ func (nc Notifier) Send(_ bool, torrent *s.TorrentInfo) {
 	var err error
 	bb := bytes.Buffer{}
 	enc := gob.NewEncoder(&bb)
-	if err = enc.Encode(torrent.Name); err == nil {
+	if err = enc.Encode(torrent); err == nil {
 		msg := &nats.Msg{
 			Subject: nc.Subject,
 			Data:    bb.Bytes(),
