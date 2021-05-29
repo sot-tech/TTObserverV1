@@ -13,7 +13,7 @@ require (
 	github.com/zeebo/bencode v1.0.0
 	google.golang.org/protobuf v1.25.0 // indirect
 	sot-te.ch/HTExtractor v0.1.2
-	sot-te.ch/MTHelper v0.1.11
+	sot-te.ch/MTHelper v0.1.12
 )
 
 replace sot-te.ch/MTHelper => ../MTHelper
