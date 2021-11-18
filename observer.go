@@ -46,6 +46,8 @@ import (
 	"time"
 )
 
+const delay = 5
+
 type Observer struct {
 	Log struct {
 		File  string `json:"file"`
@@ -101,6 +103,10 @@ func (cr *Observer) Init() error {
 	}
 	logger.Debug("Initiating notifiers")
 	cr.producer, err = producer.New(cr.Producers, cr.db)
+	if cr.Crawler.Delay == 0 {
+		logger.Info("Delay time set to 0, falling back to ", delay)
+		cr.Crawler.Delay = delay
+	}
 	cr.timer = time.NewTicker(cr.Crawler.Delay * time.Second)
 	return err
 }
