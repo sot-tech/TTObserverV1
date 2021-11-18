@@ -33,7 +33,6 @@ import (
 	"github.com/op/go-logging"
 	"html"
 	"io/ioutil"
-	"math/rand"
 	"path/filepath"
 	"sot-te.ch/HTExtractor"
 	"sot-te.ch/TTObserverV1/producer"
@@ -56,7 +55,7 @@ type Observer struct {
 		BaseURL        string                      `json:"baseurl"`
 		ContextURL     string                      `json:"contexturl"`
 		Limit          uint64                      `json:"limit"`
-		Delay          uint                        `json:"delay"`
+		Delay          time.Duration               `json:"delay"`
 		Threshold      uint                        `json:"threshold"`
 		Anniversary    uint                        `json:"anniversary"`
 		MetaActions    []HTExtractor.ExtractAction `json:"metaactions"`
@@ -69,6 +68,7 @@ type Observer struct {
 	DBFile    string            `json:"dbfile"`
 	db        *s.Database
 	producer  *producer.Announcer
+	timer     *time.Ticker
 }
 
 var logger = logging.MustGetLogger("observer")
@@ -101,6 +101,7 @@ func (cr *Observer) Init() error {
 	}
 	logger.Debug("Initiating notifiers")
 	cr.producer, err = producer.New(cr.Producers, cr.db)
+	cr.timer = time.NewTicker(cr.Crawler.Delay * time.Second)
 	return err
 }
 
@@ -108,7 +109,8 @@ func (cr Observer) Engage() {
 	var err error
 	var nextOffset uint
 	if nextOffset, err = cr.db.GetCrawlOffset(); err == nil {
-		for {
+		for range cr.timer.C {
+			logger.Debug("Checking upstream with offset ", nextOffset)
 			newNextOffset := nextOffset
 			for offsetToCheck := nextOffset; offsetToCheck < nextOffset+cr.Crawler.Threshold; offsetToCheck++ {
 				if cr.CheckTorrent(offsetToCheck) {
@@ -121,9 +123,6 @@ func (cr Observer) Engage() {
 					logger.Error(err)
 				}
 			}
-			sleepTime := time.Duration(rand.Intn(int(cr.Crawler.Delay)) + int(cr.Crawler.Delay))
-			logger.Debugf("Sleeping %d sec", sleepTime)
-			time.Sleep(sleepTime * time.Second)
 		}
 	} else {
 		logger.Fatal(err)
@@ -131,6 +130,7 @@ func (cr Observer) Engage() {
 }
 
 func (cr *Observer) Close() {
+	cr.timer.Stop()
 	cr.producer.Close()
 	cr.db.Close()
 }

@@ -38,7 +38,7 @@ Uses:
 	- baseurl - string - base url (`http://site.local`)
 	- contexturl - string - torrent context respectively to `base` (`/catalog/%d`, `%d` - is the place to insert id)
 	- threshold - uint - number to id's to check in one try. If current id is 1000 and `threshold` set to 3, observer will check 1000, 1001, 1002
-    - delay - uint - minimum delay between two checks, real delay is random between value and 2*value
+    - delay - int64 - delay between two checks
 	- anniversary - uint - notify about every N'th release as anniversary
 	- metaactions - list of actions to extract meta info release (see GoHTExtractor readme)
     - imagemetafield - string - name of field from extracted by `metaactions` where picture data stored
