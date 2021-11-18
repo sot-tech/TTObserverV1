@@ -130,9 +130,15 @@ func (cr Observer) Engage() {
 }
 
 func (cr *Observer) Close() {
-	cr.timer.Stop()
-	cr.producer.Close()
-	cr.db.Close()
+	if cr.timer != nil {
+		cr.timer.Stop()
+	}
+	if cr.producer != nil {
+		cr.producer.Close()
+	}
+	if cr.db != nil {
+		cr.db.Close()
+	}
 }
 
 func (cr Observer) CheckTorrent(offset uint) bool {
