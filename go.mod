@@ -16,7 +16,8 @@ require (
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/zeebo/bencode v1.0.0
 	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871 // indirect
-	golang.org/x/net v0.0.0-20211118161319-6a13c67c3ce4 // indirect
+	golang.org/x/image v0.0.0-20211028202545-6944b10bf410
+	golang.org/x/net v0.0.0-20211123203042-d83791d6bcd9 // indirect
 	google.golang.org/protobuf v1.25.0 // indirect
 	sot-te.ch/HTExtractor v0.1.2
 	sot-te.ch/MTHelper v0.1.13

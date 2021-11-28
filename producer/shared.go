@@ -54,8 +54,8 @@ func FormatMessage(tmpl *template.Template, values map[string]interface{}) (stri
 	var err error
 	var res string
 	if tmpl != nil {
-		buf := bytes.Buffer{}
-		if err = tmpl.Execute(&buf, values); err == nil {
+		buf := new(bytes.Buffer)
+		if err = tmpl.Execute(buf, values); err == nil {
 			res = buf.String()
 		}
 	} else {

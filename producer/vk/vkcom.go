@@ -129,9 +129,9 @@ func (vk Notifier) uploadImage(photo []byte, groupId uint) (string, error) {
 		if exts := strings.Split(http.DetectContentType(photo), "/"); len(exts) > 1 {
 			photoName = fmt.Sprintf("%d.%s", rand.Int(), exts[1])
 		}
-		bb := bytes.Buffer{}
+		bb := new(bytes.Buffer)
 		bb.Write(photo)
-		if uploadPhotoResult, err = vkapi.UploadWall(uploadServerResult.UploadURL, photoName, &bb); err == nil {
+		if uploadPhotoResult, err = vkapi.UploadWall(uploadServerResult.UploadURL, photoName, bb); err == nil {
 			var photos []vkapi.Photo
 			if photos, err = vk.client.PhotosSaveWallPhoto(vkapi.PhotosSaveWallPhotoParams{
 				GroupID: groupId,

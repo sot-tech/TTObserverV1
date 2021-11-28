@@ -70,7 +70,7 @@ type Observer struct {
 	DBFile    string            `json:"dbfile"`
 	db        *s.Database
 	producer  *producer.Announcer
-	timer     *time.Ticker
+	stopped   chan interface{}
 }
 
 var logger = logging.MustGetLogger("observer")
@@ -107,27 +107,33 @@ func (cr *Observer) Init() error {
 		logger.Info("Delay time set to 0, falling back to ", delay)
 		cr.Crawler.Delay = delay
 	}
-	cr.timer = time.NewTicker(cr.Crawler.Delay * time.Second)
 	return err
 }
 
-func (cr Observer) Engage() {
+func (cr *Observer) Engage() {
 	var err error
 	var nextOffset uint
 	if nextOffset, err = cr.db.GetCrawlOffset(); err == nil {
-		for range cr.timer.C {
-			logger.Debug("Checking upstream with offset ", nextOffset)
-			newNextOffset := nextOffset
-			for offsetToCheck := nextOffset; offsetToCheck < nextOffset+cr.Crawler.Threshold; offsetToCheck++ {
-				if cr.CheckTorrent(offsetToCheck) {
-					newNextOffset = offsetToCheck + 1
+		cr.stopped = make(chan interface{}, 1)
+		for {
+			select {
+			default:
+				logger.Debug("Checking upstream with offset ", nextOffset)
+				newNextOffset := nextOffset
+				for offsetToCheck := nextOffset; offsetToCheck < nextOffset+cr.Crawler.Threshold; offsetToCheck++ {
+					if cr.CheckTorrent(offsetToCheck) {
+						newNextOffset = offsetToCheck + 1
+					}
 				}
-			}
-			if newNextOffset > nextOffset {
-				nextOffset = newNextOffset
-				if err = cr.db.UpdateCrawlOffset(nextOffset); err != nil {
-					logger.Error(err)
+				if newNextOffset > nextOffset {
+					nextOffset = newNextOffset
+					if err = cr.db.UpdateCrawlOffset(nextOffset); err != nil {
+						logger.Error(err)
+					}
 				}
+				time.Sleep(cr.Crawler.Delay * time.Second)
+				case <- cr.stopped:
+					return
 			}
 		}
 	} else {
@@ -136,8 +142,8 @@ func (cr Observer) Engage() {
 }
 
 func (cr *Observer) Close() {
-	if cr.timer != nil {
-		cr.timer.Stop()
+	if cr.stopped != nil {
+		close(cr.stopped)
 	}
 	if cr.producer != nil {
 		cr.producer.Close()

@@ -31,6 +31,7 @@ import (
 	"errors"
 	"github.com/nfnt/resize"
 	"github.com/zeebo/bencode"
+	_ "golang.org/x/image/webp"
 	"image"
 	_ "image/gif"
 	"image/jpeg"
@@ -97,9 +98,9 @@ func GetTorrent(url string) (*TorrentInfo, error) {
 				defer resp.Body.Close()
 				if data, err = ioutil.ReadAll(resp.Body); err == nil {
 					var torrent Torrent
-					byteBuffer := bytes.Buffer{}
+					byteBuffer := new(bytes.Buffer)
 					byteBuffer.Write(data)
-					if err = bencode.NewDecoder(&byteBuffer).Decode(&torrent); err == nil {
+					if err = bencode.NewDecoder(byteBuffer).Decode(&torrent); err == nil {
 						res = &TorrentInfo{
 							Name:  torrent.Info.Name,
 							URL:   torrent.PublisherUrl,
@@ -143,9 +144,9 @@ func GetTorrentPoster(imageUrl string, maxSize uint) (error, []byte) {
 					if maxSize > 0 {
 						img = resize.Thumbnail(maxSize, maxSize, img, resize.Bicubic)
 					}
-					imgBuffer := bytes.Buffer{}
-					if err = jpeg.Encode(&imgBuffer, img, &jpeg.Options{Quality: 90}); err == nil {
-						torrentImage, err = ioutil.ReadAll(&imgBuffer)
+					imgBuffer := new(bytes.Buffer)
+					if err = jpeg.Encode(imgBuffer, img, &jpeg.Options{Quality: 90}); err == nil {
+						torrentImage = imgBuffer.Bytes()
 					}
 				}
 			} else {
