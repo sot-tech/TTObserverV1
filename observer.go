@@ -103,18 +103,20 @@ func (cr *Observer) Init() error {
 	}
 	logger.Debug("Initiating notifiers")
 	cr.producer, err = producer.New(cr.Producers, cr.db)
-	if cr.Crawler.Delay == 0 {
-		logger.Info("Delay time set to 0, falling back to ", delay)
-		cr.Crawler.Delay = delay
+	if err == nil {
+		if cr.Crawler.Delay == 0 {
+			logger.Info("Delay time set to 0, falling back to ", delay)
+			cr.Crawler.Delay = delay
+		}
+		cr.stopped = make(chan interface{}, 1)
 	}
 	return err
 }
 
-func (cr *Observer) Engage() {
+func (cr Observer) Engage() {
 	var err error
 	var nextOffset uint
 	if nextOffset, err = cr.db.GetCrawlOffset(); err == nil {
-		cr.stopped = make(chan interface{}, 1)
 		for {
 			select {
 			default:
