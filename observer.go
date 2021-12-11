@@ -68,6 +68,7 @@ type Observer struct {
 	} `json:"crawler"`
 	Producers []producer.Config `json:"producers"`
 	DBFile    string            `json:"dbfile"`
+	Cluster   Cluster           `json:"cluster"`
 	db        *s.Database
 	producer  *producer.Announcer
 	stopped   chan interface{}
@@ -134,8 +135,8 @@ func (cr Observer) Engage() {
 					}
 				}
 				time.Sleep(cr.Crawler.Delay * time.Second)
-				case <- cr.stopped:
-					return
+			case <-cr.stopped:
+				return
 			}
 		}
 	} else {

@@ -30,11 +30,9 @@ import (
 	"flag"
 	"github.com/op/go-logging"
 	"io"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"runtime"
 	"sot-te.ch/TTObserverV1"
 	"syscall"
 )
@@ -72,22 +70,21 @@ func main() {
 		println(err)
 	}
 
-	if err = tt.Init(); err == nil {
+	if len(tt.Cluster.NatsURL) > 0 {
+		startClustered(tt)
+	} else {
+		start(tt)
+	}
+}
+
+func start(tt *TTObserver.Observer) {
+	if err := tt.Init(); err == nil {
 		ch := make(chan os.Signal, 2)
 		go func() {
 			tt.Engage()
 			ch <- syscall.SIGABRT
 		}()
 		defer tt.Close()
-		if len(args) > 1 && len(args[1]) > 0 {
-			go func() {
-				runtime.GC()
-				if err := http.ListenAndServe("localhost:" + args[1], nil); err != nil {
-					logger.Error(err)
-					ch <- syscall.SIGABRT
-				}
-			}()
-		}
 		signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
 		sig := <-ch
 		if sig == syscall.SIGABRT {
@@ -95,5 +92,28 @@ func main() {
 		}
 	} else {
 		println(err)
+	}
+}
+
+func startClustered(tt *TTObserver.Observer) {
+	tt.Cluster.StartFunction = func() (err error) {
+		if err = tt.Init(); err == nil {
+			tt.Engage()
+		}
+		return
+	}
+	tt.Cluster.SuspendFunction = tt.Close
+	ch := make(chan os.Signal, 2)
+	go func() {
+		if err := tt.Cluster.Start(); err != nil {
+			println(err)
+		}
+		ch <- syscall.SIGABRT
+	}()
+	defer tt.Cluster.Stop()
+	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
+	sig := <-ch
+	if sig == syscall.SIGABRT {
+		os.Exit(1)
 	}
 }

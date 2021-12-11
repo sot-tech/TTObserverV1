@@ -4,6 +4,14 @@
 		"file": "/var/log/tto.log",
 		"level": "WARNING"
 	},
+	"cluster": {
+		"url": "",
+		"mastersubject": "tt.master",
+		"masterproposesubject": "tt.master.propose",
+		"masterpinginterval": 5,
+		"msgmaxwait": 200,
+		"masterretrycount": 3
+	},
 	"crawler": {
 		"baseurl": "http://localhost.localdomain",
 		"contexturl": "/content/torrent/%d",

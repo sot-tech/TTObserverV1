@@ -53,11 +53,12 @@ func init() {
 }
 
 type Notifier struct {
-	URL           string `json:"url"`
-	Stream        string `json:"stream"`
-	Subject       string `json:"subject"`
-	PingInterval  int    `json:"pinginterval"`
-	MaxReconnects int    `json:"maxreconnects"`
+	URL           string        `json:"url"`
+	Stream        string        `json:"stream"`
+	Subject       string        `json:"subject"`
+	PingInterval  time.Duration `json:"pinginterval"`
+	MaxReconnects int           `json:"maxreconnects"`
+	ReplicasCount int           `json:"replicascount"`
 	db            *s.Database
 	client        *nats.Conn
 	js            nats.JetStreamContext
@@ -67,8 +68,8 @@ func (nc *Notifier) init() error {
 	var err error
 	if len(nc.URL) > 0 {
 		clientOpts := []nats.Option{
-			nats.ReconnectWait(time.Duration(nc.PingInterval) * time.Second),
-			nats.PingInterval(time.Duration(nc.PingInterval) * time.Second),
+			nats.ReconnectWait(nc.PingInterval * time.Second),
+			nats.PingInterval(nc.PingInterval * time.Second),
 			nats.MaxReconnects(nc.MaxReconnects),
 			nats.ReconnectBufSize(maxMessagesInBuffer * maxMessageSize),
 		}
@@ -84,16 +85,23 @@ func (nc *Notifier) init() error {
 					}
 					logger.Debug("Checking stream ", nc.Stream, " exist: ", exist)
 					if !exist {
-						if _, err = nc.js.AddStream(&nats.StreamConfig{
-							Name:       nc.Stream,
-							Subjects:   []string{nc.Subject},
-							Retention:  nats.WorkQueuePolicy,
-							MaxAge:     maxMessageAge,
-							MaxMsgSize: maxMessageSize,
-						}); err == nil {
-							logger.Info("Created new stream: ", nc.Stream)
-						} else {
-							logger.Error("Unable to create stream: ", nc.Stream, " error: ", err)
+						if nc.ReplicasCount <= 0 {
+							logger.Warning("Replicas count must be between 1 and 5 (inclusive), using 1")
+							nc.ReplicasCount = 1
+						}
+						for ; nc.ReplicasCount > 0; nc.ReplicasCount-- {
+							if _, err = nc.js.AddStream(&nats.StreamConfig{
+								Name:       nc.Stream,
+								Subjects:   []string{nc.Subject},
+								Retention:  nats.WorkQueuePolicy,
+								MaxAge:     maxMessageAge,
+								MaxMsgSize: maxMessageSize,
+								Replicas:   nc.ReplicasCount,
+							}); err == nil {
+								logger.Info("Created new stream: ", nc.Stream)
+							} else {
+								logger.Warning("Unable to create stream: ", nc.Stream, " error: ", err, " decreasing replicas count")
+							}
 						}
 					}
 				} else {
