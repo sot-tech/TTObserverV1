@@ -43,9 +43,11 @@ import (
 var logger = logging.MustGetLogger("nats")
 
 const (
-	maxMessageSize      = 10485760 //10 MiB
-	maxMessagesInBuffer = 10
-	maxMessageAge       = 24 * time.Hour
+	maxMessageSize        = 10485760 //10 MiB
+	maxMessagesInBuffer   = 10
+	maxMessageAge         = 24 * time.Hour
+	msgErrAlreadyInUse    = "stream name already in use"
+	msgErrTooManyReplicas = "insufficient resources"
 )
 
 func init() {
@@ -97,10 +99,12 @@ func (nc *Notifier) init() error {
 								MaxAge:     maxMessageAge,
 								MaxMsgSize: maxMessageSize,
 								Replicas:   nc.ReplicasCount,
-							}); err == nil {
+							}); err == nil || err.Error() == msgErrAlreadyInUse {
 								logger.Info("Created new stream: ", nc.Stream)
-							} else {
+							} else if err.Error() == msgErrTooManyReplicas {
 								logger.Warning("Unable to create stream: ", nc.Stream, " error: ", err, " decreasing replicas count")
+							} else {
+								break
 							}
 						}
 					}
