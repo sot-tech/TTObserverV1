@@ -1,0 +1,7 @@
+{
+	"address": "localhost:6379",
+	"password": "",
+	"db": 0,
+	"hash": "SOME_REDIS_HASH",
+	"calculatev2": true
+}

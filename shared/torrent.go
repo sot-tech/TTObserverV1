@@ -97,10 +97,8 @@ func GetTorrent(url string) (*TorrentInfo, error) {
 				resp.Close = true
 				defer resp.Body.Close()
 				if data, err = ioutil.ReadAll(resp.Body); err == nil {
-					var torrent Torrent
-					byteBuffer := new(bytes.Buffer)
-					byteBuffer.Write(data)
-					if err = bencode.NewDecoder(byteBuffer).Decode(&torrent); err == nil {
+					torrent := new(Torrent)
+					if err = bencode.DecodeBytes(data, torrent); err == nil {
 						res = &TorrentInfo{
 							Name:  torrent.Info.Name,
 							URL:   torrent.PublisherUrl,

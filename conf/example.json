@@ -73,6 +73,11 @@
 			"id": "stan",
 			"type": "stan",
 			"configpath": "conf/example_stan.json"
+		},
+		{
+			"id": "redis",
+			"type": "redis",
+			"configpath": "conf/example_redis.json"
 		}
 	],
 	"dbfile": "var/lib/tto/tt.db"

@@ -59,7 +59,7 @@ const (
 	selectTorrentMeta = "SELECT NAME, VALUE FROM TT_TORRENT_META WHERE TORRENT = $1"
 	insertTorrentMeta = "INSERT INTO TT_TORRENT_META(TORRENT, NAME, VALUE) VALUES($1, $2, $3) ON CONFLICT(TORRENT,NAME) DO UPDATE SET VALUE = EXCLUDED.VALUE"
 
-	selectTorrentFiles = "SELECT ID, TORRENT, NAME FROM TT_TORRENT_FILE"
+	selectTorrentFiles          = "SELECT ID, TORRENT, NAME FROM TT_TORRENT_FILE"
 	selectTorrentFileById       = selectTorrentFiles + " WHERE ID = $1"
 	selectTorrentFilesByTorrent = selectTorrentFiles + " WHERE TORRENT = $1"
 	insertTorrentFile           = "INSERT INTO TT_TORRENT_FILE(TORRENT, NAME) VALUES ($1, $2) ON CONFLICT (TORRENT,NAME) DO NOTHING"
@@ -174,7 +174,7 @@ func (db Database) DelAdmin(id int64) error {
 
 const InvalidDBId = -1
 
-func(db Database) CheckTorrent(id int64) (bool, error){
+func (db Database) CheckTorrent(id int64) (bool, error) {
 	return db.getNotEmpty(existTorrent, id)
 }
 
@@ -278,7 +278,7 @@ func (db Database) GetTorrentFile(id int64) (DBTorrentFile, error) {
 	return file, err
 }
 
-func (db Database) GetTorrentFiles(torrent int64) ([]DBTorrentFile, error){
+func (db Database) GetTorrentFiles(torrent int64) ([]DBTorrentFile, error) {
 	return db.getTorrentFilesQuery(selectTorrentFilesByTorrent, torrent)
 }
 

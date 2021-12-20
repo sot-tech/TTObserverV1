@@ -130,7 +130,7 @@ func (st Notifier) Send(_ bool, torrent *s.TorrentInfo) {
 
 func (st *Notifier) Close() {
 	if st.client != nil {
-		if err := st.client.Close(); err != nil{
+		if err := st.client.Close(); err != nil {
 			logger.Warning(err)
 		}
 	}
