@@ -48,6 +48,8 @@ const (
 	delAdmin     = "DELETE FROM TT_ADMIN WHERE ID = $1"
 	existAdmin   = "SELECT 1 FROM TT_ADMIN WHERE ID = $1"
 
+	selectTorrents = "SELECT ID, NAME, DATA, IMAGE FROM TT_TORRENT"
+
 	selectTorrentId       = "SELECT ID FROM TT_TORRENT WHERE NAME = $1"
 	existTorrent          = "SELECT 1 FROM TT_TORRENT WHERE ID = $1"
 	insertOrUpdateTorrent = "INSERT INTO TT_TORRENT(NAME, DATA) VALUES ($1, $2) ON CONFLICT(NAME) DO UPDATE SET DATA = EXCLUDED.DATA"
@@ -55,7 +57,7 @@ const (
 	selectTorrentMeta = "SELECT NAME, VALUE FROM TT_TORRENT_META WHERE TORRENT = $1"
 	insertTorrentMeta = "INSERT INTO TT_TORRENT_META(TORRENT, NAME, VALUE) VALUES($1, $2, $3) ON CONFLICT(TORRENT,NAME) DO UPDATE SET VALUE = EXCLUDED.VALUE"
 
-	selectTorrentFiles = "SELECT ID, TORRENT, NAME FROM TT_TORRENT_FILE WHERE TORRENT = $1"
+	selectTorrentFiles = "SELECT NAME FROM TT_TORRENT_FILE WHERE TORRENT = $1"
 	insertTorrentFile  = "INSERT INTO TT_TORRENT_FILE(TORRENT, NAME) VALUES ($1, $2) ON CONFLICT (TORRENT,NAME) DO NOTHING"
 
 	selectTorrentImage = "SELECT IMAGE FROM TT_TORRENT WHERE ID = $1"
@@ -241,7 +243,7 @@ func (db database) GetTorrentFiles(torrent int64) ([]string, error) {
 			defer rows.Close()
 			for rows.Next() {
 				var file string
-				if err = rows.Scan(file); err == nil {
+				if err = rows.Scan(&file); err == nil {
 					files = append(files, file)
 				} else {
 					files = []string{}
@@ -345,4 +347,32 @@ func (db *database) Close() {
 	if db.con != nil {
 		_ = db.con.Close()
 	}
+}
+
+func (db database) MGetTorrents() (out []s.DBTorrent, err error) {
+	out = make([]s.DBTorrent, 0)
+	if err = db.checkConnection(); err == nil {
+		var rows *sql.Rows
+		if rows, err = db.con.Query(selectTorrents); err == nil {
+			if err == nil && rows != nil {
+				defer rows.Close()
+				for rows.Next() {
+					t := s.DBTorrent{
+						Data:  make([]byte, 0),
+						Image: make([]byte, 0),
+					}
+					if err = rows.Scan(&t.Id, &t.Name, &t.Data, &t.Image); err == nil {
+						out = append(out, t)
+					} else {
+						break
+					}
+				}
+			}
+		}
+	}
+	return
+}
+
+func (_ database) MPutTorrent(_ s.DBTorrent, _ []string) error {
+	return errors.New("unsupported operation")
 }

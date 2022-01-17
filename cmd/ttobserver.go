@@ -37,14 +37,13 @@ import (
 	"syscall"
 )
 
+var logger = logging.MustGetLogger("main")
+
 func main() {
+	configPath := flag.String("c", "/etc/ttobserver/main.json", "config path")
+	m := flag.Bool("m", false, "migrate from sqlite DB to redis. Both DB properties must be provided")
 	flag.Parse()
-	args := flag.Args()
-	logger := logging.MustGetLogger("main")
-	if len(args) == 0 {
-		logger.Fatal("Observer file not set")
-	}
-	tt, err := TTObserver.ReadConfig(args[0])
+	tt, err := TTObserver.ReadConfig(*configPath)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -69,8 +68,9 @@ func main() {
 	} else {
 		println(err)
 	}
-
-	if len(tt.Cluster.NatsURL) > 0 {
+	if *m {
+		migrate(tt)
+	} else if len(tt.Cluster.NatsURL) > 0 {
 		startClustered(tt)
 	} else {
 		start(tt)
@@ -91,7 +91,7 @@ func start(tt *TTObserver.Observer) {
 			os.Exit(1)
 		}
 	} else {
-		println(err)
+		println(err.Error())
 	}
 }
 

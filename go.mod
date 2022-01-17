@@ -8,7 +8,7 @@ require (
 	github.com/go-resty/resty/v2 v2.7.0 // indirect
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
-	github.com/mattn/go-sqlite3 v1.14.9
+	github.com/mattn/go-sqlite3 v1.14.10
 	github.com/minio/sha256-simd v1.0.0
 	github.com/nats-io/nats-server/v2 v2.4.0 // indirect
 	github.com/nats-io/nats-streaming-server v0.22.1 // indirect
@@ -17,11 +17,11 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/zeebo/bencode v1.0.0
-	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3 // indirect
+	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce // indirect
 	golang.org/x/image v0.0.0-20211028202545-6944b10bf410
-	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f // indirect
+	golang.org/x/net v0.0.0-20220114011407-0dd24b26b47d // indirect
 	sot-te.ch/HTExtractor v0.1.2
-	sot-te.ch/MTHelper v0.1.13
+	sot-te.ch/MTHelper v0.1.14
 )
 
 replace sot-te.ch/MTHelper => ../MTHelper

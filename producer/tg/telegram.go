@@ -188,8 +188,6 @@ func (tg *Notifier) init() error {
 	tg.messages = new(messageTemplates)
 	tg.client.Messages = tg.Messages.TGMessages
 	tg.client.BackendFunctions = mt.TGBackendFunction{
-		GetOffset:  func() (int, error) { return 0, nil },
-		SetOffset:  func(_ int) error { return nil },
 		ChatExist:  tg.db.GetChatExist,
 		ChatAdd:    tg.db.AddChat,
 		ChatRm:     tg.db.DelChat,

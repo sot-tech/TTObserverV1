@@ -144,7 +144,7 @@ func (cr Observer) Engage() {
 			return
 		}
 	}
-	logger.Fatal(err)
+	logger.Fatal("Offset fetch error", err)
 }
 
 func (cr *Observer) Close() {

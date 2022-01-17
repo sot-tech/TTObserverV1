@@ -83,7 +83,10 @@
 	"db": {
 		"driver": "sqlite3",
 		"params": {
-			"dbfile": "/var/lib/tt/db.sqlite"
+			"dbfile": "/var/lib/tt/db.sqlite",
+			"address": "localhost:6379",
+			"password": "",
+			"db": 0
 		}
 	}
 }

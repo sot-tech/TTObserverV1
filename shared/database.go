@@ -50,6 +50,12 @@ func RegisterFactory(name string, n DBFactory) {
 	}
 }
 
+type DBTorrent struct {
+	Id          int64
+	Name        string
+	Data, Image []byte
+}
+
 type Database interface {
 	AddAdmin(id int64) error
 	AddChat(chat int64) error
@@ -70,6 +76,8 @@ type Database interface {
 	GetTorrentMeta(id int64) (map[string]string, error)
 	GetTorrent(torrent string) (int64, error)
 	UpdateCrawlOffset(offset uint) error
+	MGetTorrents() ([]DBTorrent, error)
+	MPutTorrent(torrent DBTorrent, files []string) error
 }
 
 func Connect(driver string, params map[string]interface{}) (db Database, err error) {

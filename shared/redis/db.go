@@ -42,22 +42,29 @@ const (
 	ParamPassword = "password"
 	ParamDB       = "db"
 
-	prefix        = "tt_"
-	sChat         = prefix + "chat"
-	sAdmin        = prefix + "adm"
-	hConfOffset   = prefix + "offset"
-	hTorrent      = prefix + "t_"
-	hTorrentId    = prefix + "ti"
-	hTorrentFile  = hTorrent + "f_"
-	hTorrentImage = hTorrent + "i_"
-	hTorrentMeta  = hTorrent + "m_"
-	pIndex        = "idx"
-	pName         = "name"
-	pData         = "data"
+	prefix       = "tt_"
+	sChat        = prefix + "chat"
+	sAdmin       = prefix + "adm"
+	hConfOffset  = prefix + "offset"
+	hTorrent     = prefix + "t_"
+	hTorrentId   = prefix + "ti"
+	hTorrentFile = hTorrent + "f_"
+	hTorrentMeta = hTorrent + "m_"
+	pIndex       = "idx"
+	pName        = "name"
+	pData        = "data"
+	pImage       = "img"
 )
 
 type database struct {
 	con *redis.Client
+}
+
+func asNil(err error) error {
+	if errors.Is(err, redis.Nil) {
+		err = nil
+	}
+	return err
 }
 
 func init() {
@@ -71,7 +78,11 @@ func init() {
 				opts.Password = v.(string)
 			}
 			if v, ok = m[ParamDB]; ok && v != nil {
-				opts.DB = v.(int)
+				if dbNum, ok := v.(float64); ok {
+					opts.DB = int(dbNum)
+				} else {
+					return nil, errors.New("unable to parse DB id")
+				}
 			}
 			db.con = redis.NewClient(opts)
 			err = db.con.Ping(ctx).Err()
@@ -90,19 +101,30 @@ func (d database) AddChat(chat int64) error {
 	return d.con.SAdd(ctx, sChat, strconv.FormatInt(chat, 10)).Err()
 }
 
-func (d database) AddTorrentImage(id int64, image []byte) error {
-	return d.con.Set(ctx, hTorrentImage+strconv.FormatInt(id, 10), image, 0).Err()
+func (d database) AddTorrentImage(id int64, image []byte) (err error) {
+	if len(image) > 0 {
+		err = d.con.HSet(ctx, hTorrent+strconv.FormatInt(id, 10), pImage, image).Err()
+	}
+	return
 }
 
-func (d database) AddTorrentMeta(id int64, meta map[string]string) error {
-	return d.con.HSet(ctx, hTorrentMeta+strconv.FormatInt(id, 10), meta).Err()
+func (d database) AddTorrentMeta(id int64, meta map[string]string) (err error) {
+	l := len(meta)
+	if l > 0 {
+		m := make(map[string]interface{}, l)
+		for k, v := range meta {
+			m[k] = v
+		}
+		err = d.con.HSet(ctx, hTorrentMeta+strconv.FormatInt(id, 10), m).Err()
+	}
+	return
 }
 
 func (d database) AddTorrent(name string, data []byte, files []string) (id int64, err error) {
 	hkey := hTorrent + name
 	if err = d.con.HSet(ctx, hkey, pName, name, pData, data).Err(); err == nil {
 		var sid string
-		if sid, err = d.con.HGet(ctx, hkey, pIndex).Result(); err == nil {
+		if sid, err = d.con.HGet(ctx, hkey, pIndex).Result(); err == nil || asNil(err) == nil {
 			if len(sid) == 0 {
 				if id, err = d.con.Incr(ctx, hTorrent+pIndex).Result(); err == nil {
 					sid = strconv.FormatInt(id, 10)
@@ -123,7 +145,7 @@ func (d database) AddTorrent(name string, data []byte, files []string) (id int64
 			l := len(files)
 			if l > 0 {
 				ifs := make([]interface{}, l)
-				for i := 0; i < l; l++ {
+				for i := 0; i < l; i++ {
 					ifs[i] = files[i]
 				}
 				err = d.con.SAdd(ctx, hTorrentFile+sid, ifs...).Err()
@@ -144,11 +166,11 @@ func (d *database) Close() {
 }
 
 func (d database) DelAdmin(id int64) error {
-	return d.con.SRem(ctx, sAdmin, strconv.FormatInt(id, 10)).Err()
+	return asNil(d.con.SRem(ctx, sAdmin, strconv.FormatInt(id, 10)).Err())
 }
 
 func (d database) DelChat(chat int64) error {
-	return d.con.SRem(ctx, sChat, strconv.FormatInt(chat, 10)).Err()
+	return asNil(d.con.SRem(ctx, sChat, strconv.FormatInt(chat, 10)).Err())
 }
 
 func (d database) GetAdminExist(chat int64) (bool, error) {
@@ -160,11 +182,11 @@ func (d database) GetAdmins() (out []int64, err error) {
 }
 
 func (d database) getIntList(hash string) (out []int64, err error) {
-	var admins []string
-	if admins, err = d.con.SMembers(ctx, hash).Result(); err == nil {
-		if l := len(admins); l > 0 {
+	var ints []string
+	if ints, err = d.con.SMembers(ctx, hash).Result(); err == nil {
+		if l := len(ints); l > 0 {
 			out = make([]int64, 0, l)
-			for _, a := range admins {
+			for _, a := range ints {
 				if id, idErr := strconv.ParseInt(a, 10, 64); err == nil {
 					out = append(out, id)
 				} else {
@@ -173,6 +195,8 @@ func (d database) getIntList(hash string) (out []int64, err error) {
 				}
 			}
 		}
+	} else {
+		err = asNil(err)
 	}
 	return
 }
@@ -181,36 +205,73 @@ func (d database) GetChatExist(chat int64) (bool, error) {
 	return d.con.SIsMember(ctx, sChat, strconv.FormatInt(chat, 10)).Result()
 }
 
-func (d database) GetChats() ([]int64, error) {
-	return d.getIntList(sChat)
+func (d database) GetChats() (out []int64, err error) {
+	out, err = d.getIntList(sChat)
+	err = asNil(err)
+	return out, err
 }
 
 func (d database) GetCrawlOffset() (uint, error) {
-	offset, err := d.con.Get(ctx, hConfOffset).Uint64()
-	return uint(offset), err
+	out, err := d.con.Get(ctx, hConfOffset).Uint64()
+	err = asNil(err)
+	return uint(out), err
 }
 
 func (d database) GetTorrentFiles(torrent int64) ([]string, error) {
-	return d.con.SMembers(ctx, hTorrentFile+strconv.FormatInt(torrent, 10)).Result()
+	out, err := d.con.SMembers(ctx, hTorrentFile+strconv.FormatInt(torrent, 10)).Result()
+	err = asNil(err)
+	return out, err
 }
 
 func (d database) GetTorrentImage(id int64) ([]byte, error) {
-	return d.con.Get(ctx, hTorrentImage+strconv.FormatInt(id, 10)).Bytes()
+	data, err := d.con.HGet(ctx, hTorrent+strconv.FormatInt(id, 10), pImage).Bytes()
+	err = asNil(err)
+	return data, err
 }
 
 func (d database) GetTorrentMeta(id int64) (map[string]string, error) {
-	return d.con.HGetAll(ctx, hTorrentMeta+strconv.FormatInt(id, 10)).Result()
+	out, err := d.con.HGetAll(ctx, hTorrentMeta+strconv.FormatInt(id, 10)).Result()
+	err = asNil(err)
+	return out, err
 }
 
 func (d database) GetTorrent(torrent string) (id int64, err error) {
 	id = s.InvalidDBId
 	var sid string
-	if sid, err = d.con.HGet(ctx, hTorrent+torrent, pIndex).Result(); err == nil && len(sid) > 0 {
+	if sid, err = d.con.HGet(ctx, hTorrent+torrent, pIndex).Result(); err == nil {
 		id, err = strconv.ParseInt(sid, 10, 64)
+	} else {
+		err = asNil(err)
 	}
 	return
 }
 
 func (d database) UpdateCrawlOffset(offset uint) error {
 	return d.con.Set(ctx, hConfOffset, strconv.FormatUint(uint64(offset), 10), 0).Err()
+}
+
+func (_ database) MGetTorrents() ([]s.DBTorrent, error) {
+	return nil, errors.New("unsupported operation")
+}
+
+func (d database) MPutTorrent(t s.DBTorrent, fs []string) (err error) {
+	hKey := hTorrent + t.Name
+	if err = d.con.HSet(ctx, hKey, pName, t.Name, pData, t.Data, pImage, t.Image).Err(); err == nil {
+		sid := strconv.FormatInt(t.Id, 10)
+		l := len(fs)
+		if l > 0 {
+			fKey := hTorrentFile + sid
+			ifs := make([]interface{}, l)
+			for i := 0; i < l; i++ {
+				ifs[i] = fs[i]
+			}
+			err = d.con.SAdd(ctx, fKey, ifs...).Err()
+		}
+		if err == nil {
+			if err = d.con.HSet(ctx, hTorrentId, sid, hKey).Err(); err == nil {
+				err = d.con.Set(ctx, hTorrent+pIndex, sid, 0).Err()
+			}
+		}
+	}
+	return
 }
