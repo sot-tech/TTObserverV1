@@ -3,5 +3,6 @@
 	"stream": "tt",
 	"subject": "tt.newtorrent",
 	"pinginterval": 2,
-	"maxreconnects": -1
+	"maxreconnects": -1,
+	"replicascount": 3
 }
