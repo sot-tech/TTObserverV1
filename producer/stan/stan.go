@@ -54,7 +54,7 @@ type Notifier struct {
 	Subject         string `json:"subject"`
 	PingSleep       int    `json:"pingsleep"`
 	PingMax         int    `json:"pingmax"`
-	db              *s.Database
+	db              s.Database
 	client          stan.Conn
 	reconnectWaiter *sync.WaitGroup
 	clientOpts      []stan.Option
@@ -91,7 +91,7 @@ func (st *Notifier) init() error {
 	return err
 }
 
-func (st Notifier) New(configPath string, db *s.Database) (producer.Producer, error) {
+func (st Notifier) New(configPath string, db s.Database) (producer.Producer, error) {
 	var err error
 	n := &Notifier{
 		db:              db,

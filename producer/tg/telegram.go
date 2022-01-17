@@ -48,7 +48,6 @@ const (
 
 	cmdLsAdmins     = "/lsadmins"
 	cmdLsChats      = "/lschats"
-	cmdLsReleases   = "/lsreleases"
 	cmdUpdatePoster = "/uploadposter"
 )
 
@@ -85,7 +84,7 @@ type Notifier struct {
 		MultipleIndexes string            `json:"multipleindexes,omitempty"`
 	} `json:"msg"`
 	messages *messageTemplates
-	db       *s.Database
+	db       s.Database
 	client   *mt.Telegram
 }
 
@@ -149,34 +148,6 @@ func (tg Notifier) getState(chat int64) (string, error) {
 	})
 }
 
-func (tg Notifier) getReleases(chat int64, args string) error {
-	var err error
-	var isAdmin bool
-	if isAdmin, err = tg.db.GetAdminExist(chat); isAdmin {
-		var values strings.Builder
-		var torrents []s.DBTorrent
-		if torrents, err = tg.db.GetTorrents(args); err == nil {
-			if len(torrents) > 0 {
-				for _, torrent := range torrents {
-					values.WriteString(torrent.String())
-					values.WriteRune('\n')
-				}
-				tg.client.SendMsg(values.String(), []int64{chat}, false)
-			} else {
-				err = errors.New("not found")
-			}
-		}
-	} else {
-		if err == nil {
-			logger.Infof("LsReleases unauthorized %d", chat)
-			err = errors.New(tg.Messages.Unauthorized)
-		} else {
-			logger.Warningf("LsReleases: %v", err)
-		}
-	}
-	return err
-}
-
 func (tg Notifier) uploadPoster(chat int64, args string) error {
 	var err error
 	var isAdmin bool
@@ -217,8 +188,8 @@ func (tg *Notifier) init() error {
 	tg.messages = new(messageTemplates)
 	tg.client.Messages = tg.Messages.TGMessages
 	tg.client.BackendFunctions = mt.TGBackendFunction{
-		GetOffset:  tg.db.GetTgOffset,
-		SetOffset:  tg.db.UpdateTgOffset,
+		GetOffset:  func() (int, error) { return 0, nil },
+		SetOffset:  func(_ int) error { return nil },
 		ChatExist:  tg.db.GetChatExist,
 		ChatAdd:    tg.db.AddChat,
 		ChatRm:     tg.db.DelChat,
@@ -236,11 +207,6 @@ func (tg *Notifier) init() error {
 		}
 		if subErr = tg.client.AddCommand(cmdLsAdmins, func(chat int64, _, _ string) error {
 			return tg.getChats(chat, true)
-		}); subErr != nil {
-			logger.Error(subErr)
-		}
-		if subErr = tg.client.AddCommand(cmdLsReleases, func(chat int64, _, args string) error {
-			return tg.getReleases(chat, args)
 		}); subErr != nil {
 			logger.Error(subErr)
 		}
@@ -299,7 +265,7 @@ func (tg Notifier) sendMsgToMobs(msg string, photo []byte) {
 	}
 }
 
-func (_ Notifier) New(configPath string, db *s.Database) (producer.Producer, error) {
+func (_ Notifier) New(configPath string, db s.Database) (producer.Producer, error) {
 	var err error
 	n := &Notifier{db: db}
 	var confBytes []byte

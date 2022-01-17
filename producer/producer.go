@@ -44,7 +44,7 @@ type Producer interface {
 }
 
 type Factory interface {
-	New(string, *tts.Database) (Producer, error)
+	New(string, tts.Database) (Producer, error)
 }
 
 var factories = make(map[string]Factory)

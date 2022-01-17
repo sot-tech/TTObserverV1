@@ -84,12 +84,12 @@ func (cl *Cluster) Start() error {
 			default:
 				if resp, err := cl.client.Request(cl.MasterSubject, []byte(pingMsg), cl.MaxWait*time.Millisecond); err == nil {
 					errorCount = 0
-					logger.Debug("Master alive")
+					logger.Notice("Master alive")
 					if len(resp.Data) == 0 || string(resp.Data) != answerMsg {
 						logger.Warning("Unexpected response received: ", resp.Data, " ignoring")
 					}
 				} else if errors.Is(nats.ErrNoResponders, err) || errors.Is(nats.ErrTimeout, err) {
-					logger.Info("Master did not respond")
+					logger.Warning("Master did not respond")
 					errorCount++
 					if errorCount >= cl.MasterRetryCount {
 						if err = cl.asMaster(); err != nil {
@@ -116,7 +116,7 @@ func (cl *Cluster) asMaster() error {
 	rand.Read(ownId)
 	if cl.proposedSub, err = cl.client.Subscribe(cl.ProposeSubject, func(msg *nats.Msg) {
 		if msg != nil && !bytes.Equal(ownId, msg.Data) {
-			logger.Info("Received message from another node ", msg.Data)
+			logger.Notice("Received message from another node ", msg.Data)
 			_ = msg.Respond(ownId)
 		}
 	}); err != nil {
@@ -125,11 +125,11 @@ func (cl *Cluster) asMaster() error {
 	_, reqErr := cl.client.Request(cl.ProposeSubject, ownId, cl.MaxWait*time.Millisecond)
 	master := errors.Is(nats.ErrNoResponders, reqErr) || errors.Is(nats.ErrTimeout, reqErr)
 	if master {
-		logger.Info("Become a master")
+		logger.Notice("Become a master")
 		cl.masterSub, err = cl.client.Subscribe(cl.MasterSubject, func(msg *nats.Msg) {
 			if msg != nil {
 				if err = msg.Respond([]byte(answerMsg)); err != nil {
-					logger.Warning(err)
+					logger.Error(err)
 				}
 			}
 		})
@@ -137,7 +137,7 @@ func (cl *Cluster) asMaster() error {
 			err = cl.StartFunction()
 		}
 	} else {
-		logger.Info("Found another master propose")
+		logger.Notice("Found another master propose")
 	}
 	_ = cl.proposedSub.Unsubscribe()
 	cl.proposedSub = nil

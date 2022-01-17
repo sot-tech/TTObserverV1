@@ -80,10 +80,10 @@ type Notifier struct {
 	} `json:"msg"`
 	client        *vkapi.API
 	ignorePattern *regexp.Regexp
-	db            *s.Database
+	db            s.Database
 }
 
-func (_ Notifier) New(configPath string, db *s.Database) (producer.Producer, error) {
+func (_ Notifier) New(configPath string, db s.Database) (producer.Producer, error) {
 	var err error
 	n := &Notifier{db: db}
 	var confBytes []byte

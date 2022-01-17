@@ -77,7 +77,7 @@ type Notifier struct {
 	con         *redis.Client
 }
 
-func (r Notifier) New(configPath string, _ *s.Database) (producer.Producer, error) {
+func (r Notifier) New(configPath string, _ s.Database) (producer.Producer, error) {
 	var err error
 	n := new(Notifier)
 	var confBytes []byte

@@ -43,6 +43,8 @@ import (
 	_ "sot-te.ch/TTObserverV1/producer/tg"
 	_ "sot-te.ch/TTObserverV1/producer/vk"
 	s "sot-te.ch/TTObserverV1/shared"
+	_ "sot-te.ch/TTObserverV1/shared/redis"
+	_ "sot-te.ch/TTObserverV1/shared/sqlite"
 	"strings"
 	"time"
 )
@@ -68,11 +70,14 @@ type Observer struct {
 		metaExtractor  *HTExtractor.Extractor
 	} `json:"crawler"`
 	Producers []producer.Config `json:"producers"`
-	DBFile    string            `json:"dbfile"`
-	Cluster   Cluster           `json:"cluster"`
-	db        *s.Database
-	producer  *producer.Announcer
-	stopped   chan interface{}
+	DB        struct {
+		Driver     string                 `json:"driver"`
+		Parameters map[string]interface{} `json:"params"`
+	} `json:"db"`
+	Cluster  Cluster `json:"cluster"`
+	db       s.Database
+	producer *producer.Announcer
+	stopped  chan interface{}
 }
 
 var logger = logging.MustGetLogger("observer")
@@ -88,7 +93,7 @@ func ReadConfig(path string) (*Observer, error) {
 
 func (cr *Observer) Init() error {
 	var err error
-	if cr.db, err = s.ConnectDB(cr.DBFile); err != nil {
+	if cr.db, err = s.Connect(cr.DB.Driver, cr.DB.Parameters); err != nil {
 		return err
 	}
 	logger.Debug("Initiating meta extractor")
@@ -118,31 +123,28 @@ func (cr *Observer) Init() error {
 func (cr Observer) Engage() {
 	var err error
 	var nextOffset uint
-	if nextOffset, err = cr.db.GetCrawlOffset(); err == nil {
-		for {
-			select {
-			default:
-				logger.Debug("Checking upstream with offset ", nextOffset)
-				newNextOffset := nextOffset
-				for offsetToCheck := nextOffset; offsetToCheck < nextOffset+cr.Crawler.Threshold; offsetToCheck++ {
-					if cr.CheckTorrent(offsetToCheck) {
-						newNextOffset = offsetToCheck + 1
-					}
+	for nextOffset, err = cr.db.GetCrawlOffset(); err == nil; nextOffset, err = cr.db.GetCrawlOffset() {
+		select {
+		default:
+			logger.Debug("Checking upstream with offset ", nextOffset)
+			newNextOffset := nextOffset
+			for offsetToCheck := nextOffset; offsetToCheck < nextOffset+cr.Crawler.Threshold; offsetToCheck++ {
+				if cr.CheckTorrent(offsetToCheck) {
+					newNextOffset = offsetToCheck + 1
 				}
-				if newNextOffset > nextOffset {
-					nextOffset = newNextOffset
-					if err = cr.db.UpdateCrawlOffset(nextOffset); err != nil {
-						logger.Error(err)
-					}
-				}
-				time.Sleep(cr.Crawler.Delay * time.Second)
-			case <-cr.stopped:
-				return
 			}
+			if newNextOffset > nextOffset {
+				nextOffset = newNextOffset
+				if err = cr.db.UpdateCrawlOffset(nextOffset); err != nil {
+					logger.Error(err)
+				}
+			}
+			time.Sleep(cr.Crawler.Delay * time.Second)
+		case <-cr.stopped:
+			return
 		}
-	} else {
-		logger.Fatal(err)
 	}
+	logger.Fatal(err)
 }
 
 func (cr *Observer) Close() {
@@ -170,12 +172,12 @@ func (cr Observer) CheckTorrent(offset uint) bool {
 				var torrentId int64
 				var isNew bool
 				if torrentId, err = cr.db.GetTorrent(torrent.Name); err == nil {
-					var existFiles []s.DBTorrentFile
+					var existFiles []string
 					if existFiles, err = cr.db.GetTorrentFiles(torrentId); err == nil {
 						if len(existFiles) > 0 {
 							for _, file := range existFiles {
-								if _, ok := torrent.Files[file.Name]; ok {
-									torrent.Files[file.Name] = false
+								if _, ok := torrent.Files[file]; ok {
+									torrent.Files[file] = false
 								}
 							}
 						}

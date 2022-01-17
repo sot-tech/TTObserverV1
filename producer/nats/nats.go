@@ -61,7 +61,7 @@ type Notifier struct {
 	PingInterval  time.Duration `json:"pinginterval"`
 	MaxReconnects int           `json:"maxreconnects"`
 	ReplicasCount int           `json:"replicascount"`
-	db            *s.Database
+	db            s.Database
 	client        *nats.Conn
 	js            nats.JetStreamContext
 }
@@ -120,7 +120,7 @@ func (nc *Notifier) init() error {
 	return err
 }
 
-func (nc Notifier) New(configPath string, db *s.Database) (producer.Producer, error) {
+func (nc Notifier) New(configPath string, db s.Database) (producer.Producer, error) {
 	var err error
 	n := &Notifier{db: db}
 	var confBytes []byte

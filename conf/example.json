@@ -60,7 +60,7 @@
 			"configpath": "conf/example_tg.json"
 		},
 		{
-			"id":"vk",
+			"id": "vk",
 			"type": "vkcom",
 			"configpath": "conf/example_vk.json"
 		},
@@ -80,5 +80,10 @@
 			"configpath": "conf/example_redis.json"
 		}
 	],
-	"dbfile": "var/lib/tto/tt.db"
+	"db": {
+		"driver": "sqlite3",
+		"params": {
+			"dbfile": "/var/lib/tt/db.sqlite"
+		}
+	}
 }

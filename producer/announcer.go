@@ -34,12 +34,12 @@ import (
 
 type Announcer struct {
 	producers []Producer
-	db        *tts.Database
+	db        tts.Database
 }
 
 var producers = make(map[string]Producer)
 
-func New(configs []Config, db *tts.Database) (*Announcer, error) {
+func New(configs []Config, db tts.Database) (*Announcer, error) {
 	var err error
 	a := &Announcer{
 		producers: make([]Producer, 0),
