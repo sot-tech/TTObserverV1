@@ -84,7 +84,7 @@ func (cl *Cluster) Start() error {
 			default:
 				if resp, err := cl.client.Request(cl.MasterSubject, []byte(pingMsg), cl.MaxWait*time.Millisecond); err == nil {
 					errorCount = 0
-					logger.Notice("Master alive")
+					logger.Info("Master alive")
 					if len(resp.Data) == 0 || string(resp.Data) != answerMsg {
 						logger.Warning("Unexpected response received: ", resp.Data, " ignoring")
 					}
