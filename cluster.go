@@ -28,6 +28,7 @@ package TTObserver
 
 import (
 	"bytes"
+	cr "crypto/rand"
 	"errors"
 	"github.com/nats-io/nats.go"
 	"math/rand"
@@ -38,72 +39,84 @@ type Cluster struct {
 	NatsURL                string        `json:"url"`
 	MasterSubject          string        `json:"mastersubject"`
 	ProposeSubject         string        `json:"masterproposesubject"`
-	MasterPingInterval     time.Duration `json:"masterpinginterval"`
+	MasterPingInterval     int64         `json:"masterpinginterval"`
 	MaxWait                time.Duration `json:"msgmaxwait"`
 	MasterRetryCount       uint32        `json:"masterretrycount"`
-	StartFunction          func() error  `json:"-"`
-	SuspendFunction        func()        `json:"-"`
+	StartFn                func() error  `json:"-"`
+	SuspendFn              func()        `json:"-"`
 	client                 *nats.Conn
 	masterSub, proposedSub *nats.Subscription
 	stopped                chan interface{}
 }
 
 const (
-	DefaultPingInterval = time.Duration(10)
-	pingMsg             = "PING"
-	answerMsg           = "PONG"
+	DefaultPingInterval = 10
+	idLen               = 8
 )
 
 var (
 	errNATSConfigNotSet = errors.New("nats URL or subjects not set")
 	errFunctionsNotSet  = errors.New("function for start or suspend not set")
+	ownId               = make([]byte, idLen)
 )
+
+func init() {
+	//Sometimes the same ID is generated so using secure random
+	if _, err := cr.Read(ownId); err != nil {
+		logger.Panic(err)
+	}
+	seed := int64(ownId[0])<<56 | int64(ownId[1])<<48 | int64(ownId[2])<<40 | int64(ownId[3])<<32 |
+		int64(ownId[4])<<24 | int64(ownId[5])<<16 | int64(ownId[6])<<8 | int64(ownId[7])
+	rand.Seed(seed)
+}
 
 func (cl *Cluster) Start() error {
 	if len(cl.NatsURL) == 0 || len(cl.MasterSubject) == 0 || len(cl.ProposeSubject) == 0 {
 		return errNATSConfigNotSet
 	}
-	if cl.StartFunction == nil || cl.SuspendFunction == nil {
+	if cl.StartFn == nil || cl.SuspendFn == nil {
 		return errFunctionsNotSet
 	}
 	if cl.MasterPingInterval <= 0 {
 		logger.Warning("MasterPingInterval not set, using ", DefaultPingInterval)
 		cl.MasterPingInterval = DefaultPingInterval
 	}
+	pingReconnectWait := (time.Duration(cl.MasterPingInterval) * time.Second) / 3
 	clientOpts := []nats.Option{
-		nats.ReconnectWait(cl.MasterPingInterval * time.Second / 3),
-		nats.PingInterval(cl.MasterPingInterval * time.Second / 3),
+		nats.ReconnectWait(pingReconnectWait),
+		nats.PingInterval(pingReconnectWait),
 		nats.MaxReconnects(-1),
 	}
 	var err error
 	if cl.client, err = nats.Connect(cl.NatsURL, clientOpts...); err == nil {
 		cl.stopped = make(chan interface{})
 		var errorCount uint32 = 0
+		var resp *nats.Msg
 		for {
 			select {
 			default:
-				if resp, err := cl.client.Request(cl.MasterSubject, []byte(pingMsg), cl.MaxWait*time.Millisecond); err == nil {
-					errorCount = 0
-					logger.Info("Master alive")
-					if len(resp.Data) == 0 || string(resp.Data) != answerMsg {
-						logger.Warning("Unexpected response received: ", resp.Data, " ignoring")
+				if resp, err = cl.client.Request(cl.MasterSubject, ownId, cl.MaxWait*time.Millisecond); err == nil {
+					if errorCount > 0 {
+						logger.Notice("Master alive, id: ", resp.Data)
+						errorCount = 0
 					}
-				} else if errors.Is(nats.ErrNoResponders, err) || errors.Is(nats.ErrTimeout, err) {
+				} else if cl.noResponders(err) {
 					logger.Warning("Master did not respond")
 					errorCount++
 					if errorCount >= cl.MasterRetryCount {
 						if err = cl.asMaster(); err != nil {
-							logger.Error(err)
+							logger.Error("Master work error ", err, " suspending")
+							cl.SuspendFn()
 						}
 					}
 				} else {
 					logger.Error("Error received while master ping: ", err)
 				}
 			case <-cl.stopped:
-				cl.SuspendFunction()
+				cl.SuspendFn()
 				return nil
 			}
-			time.Sleep((cl.MasterPingInterval + time.Duration(rand.Int63n(int64(cl.MasterPingInterval)))) * time.Second)
+			time.Sleep(time.Duration(cl.MasterPingInterval+rand.Int63n(cl.MasterPingInterval)) * time.Second)
 		}
 	}
 	return err
@@ -111,49 +124,55 @@ func (cl *Cluster) Start() error {
 
 func (cl *Cluster) asMaster() error {
 	var err error
-	logger.Info("Begin master propose")
-	ownId := make([]byte, 32)
-	rand.Read(ownId)
-	if cl.proposedSub, err = cl.client.Subscribe(cl.ProposeSubject, func(msg *nats.Msg) {
-		if msg != nil && !bytes.Equal(ownId, msg.Data) {
-			logger.Notice("Received message from another node ", msg.Data)
-			_ = msg.Respond(ownId)
-		}
-	}); err != nil {
-		return err
-	}
-	_, reqErr := cl.client.Request(cl.ProposeSubject, ownId, cl.MaxWait*time.Millisecond)
-	master := errors.Is(nats.ErrNoResponders, reqErr) || errors.Is(nats.ErrTimeout, reqErr)
-	if master {
-		logger.Notice("Become a master")
-		cl.masterSub, err = cl.client.Subscribe(cl.MasterSubject, func(msg *nats.Msg) {
-			if msg != nil {
-				if err = msg.Respond([]byte(answerMsg)); err != nil {
-					logger.Error(err)
-				}
+	logger.Info("Begin master propose, my id: ", ownId)
+	if cl.proposedSub, err = cl.client.Subscribe(cl.ProposeSubject, respondId); err == nil {
+		defer cl.unsubPropose()
+		var resp *nats.Msg
+		if resp, err = cl.client.Request(cl.ProposeSubject, ownId, cl.MaxWait*time.Millisecond); err == nil {
+			logger.Notice("Found another master propose from node: ", resp.Data)
+		} else if cl.noResponders(err) {
+			err = nil
+			logger.Notice("Become a master, my id: ", ownId)
+			if cl.masterSub, err = cl.client.Subscribe(cl.MasterSubject, respondId); err == nil {
+				defer cl.unsubMaster()
+				err = cl.StartFn()
 			}
-		})
-		if err == nil {
-			err = cl.StartFunction()
 		}
-	} else {
-		logger.Notice("Found another master propose")
 	}
-	_ = cl.proposedSub.Unsubscribe()
-	cl.proposedSub = nil
 	return err
+}
+
+func (cl Cluster) noResponders(err error) bool {
+	return errors.Is(err, nats.ErrNoResponders) || cl.client.IsConnected() && errors.Is(err, nats.ErrTimeout)
+}
+
+func respondId(msg *nats.Msg) {
+	if msg != nil && !bytes.Equal(ownId, msg.Data) {
+		logger.Debug("Received message from node: ", msg.Data)
+		if err := msg.Respond(ownId); err != nil {
+			logger.Error(err)
+		}
+	}
+}
+
+func (cl *Cluster) unsubPropose() {
+	if cl.proposedSub != nil {
+		_ = cl.proposedSub.Unsubscribe()
+	}
+}
+
+func (cl *Cluster) unsubMaster() {
+	if cl.masterSub != nil {
+		_ = cl.masterSub.Unsubscribe()
+	}
 }
 
 func (cl *Cluster) Stop() {
 	if cl.stopped != nil {
 		close(cl.stopped)
 	}
-	if cl.proposedSub != nil {
-		_ = cl.proposedSub.Unsubscribe()
-	}
-	if cl.masterSub != nil {
-		_ = cl.masterSub.Unsubscribe()
-	}
+	cl.unsubPropose()
+	cl.unsubMaster()
 	if cl.client != nil && cl.client.IsConnected() {
 		cl.client.Close()
 	}

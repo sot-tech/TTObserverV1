@@ -91,22 +91,22 @@ func start(tt *TTObserver.Observer) {
 			os.Exit(1)
 		}
 	} else {
-		println(err.Error())
+		logger.Error(err)
 	}
 }
 
 func startClustered(tt *TTObserver.Observer) {
-	tt.Cluster.StartFunction = func() (err error) {
+	tt.Cluster.StartFn = func() (err error) {
 		if err = tt.Init(); err == nil {
 			tt.Engage()
 		}
 		return
 	}
-	tt.Cluster.SuspendFunction = tt.Close
+	tt.Cluster.SuspendFn = tt.Close
 	ch := make(chan os.Signal, 2)
 	go func() {
 		if err := tt.Cluster.Start(); err != nil {
-			println(err)
+			logger.Error(err)
 		}
 		ch <- syscall.SIGABRT
 	}()
