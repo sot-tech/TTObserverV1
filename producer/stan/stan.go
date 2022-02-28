@@ -41,7 +41,10 @@ import (
 	"time"
 )
 
-var logger = logging.MustGetLogger("stan")
+var (
+	logger   = logging.MustGetLogger("stan")
+	errDummy = errors.New("")
+)
 
 func init() {
 	producer.RegisterFactory("stan", Notifier{})
@@ -86,7 +89,7 @@ func (st *Notifier) init() error {
 		}
 		st.client, err = stan.Connect(st.ClusterId, st.ClientId, st.clientOpts...)
 	} else {
-		err = errors.New("required parameters not set")
+		err = s.ErrRequiredParameters
 	}
 	return err
 }
@@ -115,7 +118,7 @@ func (st Notifier) Send(_ bool, torrent *s.TorrentInfo) {
 	bb := new(bytes.Buffer)
 	enc := gob.NewEncoder(bb)
 	if err = enc.Encode(torrent); err == nil {
-		err = errors.New("")
+		err = errDummy
 		for i := 0; i < stan.DefaultPingMaxOut && err != nil; i++ {
 			st.reconnectWaiter.Wait()
 			if err = st.client.Publish(st.Subject, bb.Bytes()); err != nil {

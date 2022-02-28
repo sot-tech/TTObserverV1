@@ -38,6 +38,7 @@ import (
 	mt "sot-te.ch/MTHelper"
 	"sot-te.ch/TTObserverV1/producer"
 	s "sot-te.ch/TTObserverV1/shared"
+	"strconv"
 	"strings"
 	tmpl "text/template"
 )
@@ -51,7 +52,10 @@ const (
 	cmdUpdatePoster = "/uploadposter"
 )
 
-var logger = logging.MustGetLogger("tg")
+var (
+	logger      = logging.MustGetLogger("tg")
+	errNotFound = errors.New("not found")
+)
 
 func init() {
 	producer.RegisterFactory("telegram", Notifier{})
@@ -83,9 +87,10 @@ type Notifier struct {
 		SingleIndex     string            `json:"singleindex,omitempty"`
 		MultipleIndexes string            `json:"multipleindexes,omitempty"`
 	} `json:"msg"`
-	messages *messageTemplates
-	db       s.Database
-	client   *mt.Telegram
+	messages        *messageTemplates
+	db              s.Database
+	client          *mt.Telegram
+	errUnauthorized error
 }
 
 func (tg Notifier) getChats(chat int64, admins bool) error {
@@ -117,7 +122,7 @@ func (tg Notifier) getChats(chat int64, admins bool) error {
 	} else {
 		if err == nil {
 			logger.Infof("LsChats unauthorized %d", chat)
-			err = errors.New(tg.Messages.Unauthorized)
+			err = tg.errUnauthorized
 		} else {
 			logger.Warningf("LsChats: %v", err)
 		}
@@ -148,33 +153,32 @@ func (tg Notifier) getState(chat int64) (string, error) {
 	})
 }
 
-func (tg Notifier) uploadPoster(chat int64, args string) error {
+func (tg Notifier) uploadPoster(chat int64, args []string) error {
 	var err error
 	var isAdmin bool
 	if isAdmin, err = tg.db.GetAdminExist(chat); isAdmin {
 		var torrentId int64
-		var posterUrl string
-		if _, err = fmt.Sscanf(args, "%d %s", &torrentId, &posterUrl); err == nil {
+		if len(args) < 2 || len(args[0]) == 0 || len(args[1]) == 0 {
+			err = s.ErrRequiredParameters
+		} else if torrentId, err = strconv.ParseInt(args[0], 10, 64); err == nil {
 			var exist bool
 			if exist, err = tg.db.CheckTorrent(torrentId); err == nil {
 				if exist {
-					if len(posterUrl) > 0 {
-						var torrentPoster []byte
-						if err, torrentPoster = s.GetTorrentPoster(posterUrl, 0); err == nil {
-							if err = tg.db.AddTorrentImage(torrentId, torrentPoster); err == nil {
-								tg.client.SendMsg(tg.Messages.Added, []int64{chat}, false)
-							}
+					var torrentPoster []byte
+					if err, torrentPoster = s.GetTorrentPoster(args[1], 0); err == nil {
+						if err = tg.db.AddTorrentImage(torrentId, torrentPoster); err == nil {
+							tg.client.SendMsg(tg.Messages.Added, []int64{chat}, false)
 						}
 					}
 				} else {
-					err = errors.New("not found")
+					err = errNotFound
 				}
 			}
 		}
 	} else {
 		if err == nil {
 			logger.Infof("UploadPoster unauthorized %d", chat)
-			err = errors.New(tg.Messages.Unauthorized)
+			err = tg.errUnauthorized
 		} else {
 			logger.Warningf("UploadPoster: %v", err)
 		}
@@ -198,17 +202,17 @@ func (tg *Notifier) init() error {
 	}
 	if err = tg.client.LoginAsBot(tg.BotToken, mt.MtLogWarning); err == nil {
 		var subErr error
-		if subErr = tg.client.AddCommand(cmdLsChats, func(chat int64, _, _ string) error {
+		if subErr = tg.client.AddCommand(cmdLsChats, func(chat int64, _ string, _ []string) error {
 			return tg.getChats(chat, false)
 		}); subErr != nil {
 			logger.Error(subErr)
 		}
-		if subErr = tg.client.AddCommand(cmdLsAdmins, func(chat int64, _, _ string) error {
+		if subErr = tg.client.AddCommand(cmdLsAdmins, func(chat int64, _ string, _ []string) error {
 			return tg.getChats(chat, true)
 		}); subErr != nil {
 			logger.Error(subErr)
 		}
-		if subErr = tg.client.AddCommand(cmdUpdatePoster, func(chat int64, _, args string) error {
+		if subErr = tg.client.AddCommand(cmdUpdatePoster, func(chat int64, _ string, args []string) error {
 			return tg.uploadPoster(chat, args)
 		}); subErr != nil {
 			logger.Error(subErr)
@@ -228,6 +232,7 @@ func (tg *Notifier) init() error {
 		if tg.messages.multipleIndexes, subErr = tmpl.New("multipleIndexes").Parse(tg.Messages.MultipleIndexes); subErr != nil {
 			logger.Error(subErr)
 		}
+		tg.errUnauthorized = errors.New(tg.Messages.Unauthorized)
 	}
 	return err
 }

@@ -80,7 +80,7 @@ func init() {
 				err = db.checkConnection()
 			}
 		} else {
-			err = errors.New("parameter '" + ParamPath + "' not found")
+			err = s.ErrRequiredParameters
 		}
 		return db, err
 	})
@@ -374,5 +374,5 @@ func (db database) MGetTorrents() (out []s.DBTorrent, err error) {
 }
 
 func (_ database) MPutTorrent(_ s.DBTorrent, _ []string) error {
-	return errors.New("unsupported operation")
+	return s.ErrUnsupportedOperation
 }

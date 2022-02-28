@@ -112,7 +112,7 @@ func (_ Notifier) New(configPath string, db s.Database) (producer.Producer, erro
 					}
 				}
 			} else {
-				err = errors.New("unable to initialize vk client, tokens are empty")
+				err = s.ErrRequiredParameters
 			}
 		}
 	}

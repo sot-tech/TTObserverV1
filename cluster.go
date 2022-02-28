@@ -32,6 +32,7 @@ import (
 	"errors"
 	"github.com/nats-io/nats.go"
 	"math/rand"
+	"sot-te.ch/TTObserverV1/shared"
 	"time"
 )
 
@@ -55,9 +56,7 @@ const (
 )
 
 var (
-	errNATSConfigNotSet = errors.New("nats URL or subjects not set")
-	errFunctionsNotSet  = errors.New("function for start or suspend not set")
-	ownId               = make([]byte, idLen)
+	ownId = make([]byte, idLen)
 )
 
 func init() {
@@ -71,11 +70,8 @@ func init() {
 }
 
 func (cl *Cluster) Start() error {
-	if len(cl.NatsURL) == 0 || len(cl.MasterSubject) == 0 || len(cl.ProposeSubject) == 0 {
-		return errNATSConfigNotSet
-	}
-	if cl.StartFn == nil || cl.SuspendFn == nil {
-		return errFunctionsNotSet
+	if len(cl.NatsURL) == 0 || len(cl.MasterSubject) == 0 || len(cl.ProposeSubject) == 0 || cl.StartFn == nil || cl.SuspendFn == nil {
+		return shared.ErrRequiredParameters
 	}
 	if cl.MasterPingInterval <= 0 {
 		logger.Warning("MasterPingInterval not set, using ", DefaultPingInterval)

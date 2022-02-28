@@ -30,7 +30,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
-	"errors"
 	"github.com/nats-io/nats.go"
 	"github.com/op/go-logging"
 	"io/ioutil"
@@ -115,7 +114,7 @@ func (nc *Notifier) init() error {
 			}
 		}
 	} else {
-		err = errors.New("required parameters not set")
+		err = s.ErrRequiredParameters
 	}
 	return err
 }

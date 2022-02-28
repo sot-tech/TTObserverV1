@@ -81,7 +81,7 @@ func init() {
 				if dbNum, ok := v.(float64); ok {
 					opts.DB = int(dbNum)
 				} else {
-					return nil, errors.New("unable to parse DB id")
+					return nil, s.ErrRequiredParameters
 				}
 			}
 			db.con = redis.NewClient(opts)
@@ -251,7 +251,7 @@ func (d database) UpdateCrawlOffset(offset uint) error {
 }
 
 func (_ database) MGetTorrents() ([]s.DBTorrent, error) {
-	return nil, errors.New("unsupported operation")
+	return nil, s.ErrUnsupportedOperation
 }
 
 func (d database) MPutTorrent(t s.DBTorrent, fs []string) (err error) {

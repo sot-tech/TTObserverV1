@@ -48,7 +48,10 @@ const (
 	MsgNewIndexes = "newindexes"
 )
 
-var logger = logging.MustGetLogger("notifier")
+var (
+	logger            = logging.MustGetLogger("notifier")
+	ErrTemplateNotSet = errors.New("template not initiated")
+)
 
 func FormatMessage(tmpl *template.Template, values map[string]interface{}) (string, error) {
 	var err error
@@ -59,7 +62,7 @@ func FormatMessage(tmpl *template.Template, values map[string]interface{}) (stri
 			res = buf.String()
 		}
 	} else {
-		err = errors.New("template not initiated")
+		err = ErrTemplateNotSet
 	}
 	return res, err
 }

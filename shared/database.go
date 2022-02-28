@@ -35,8 +35,12 @@ const InvalidDBId = -1
 
 type DBFactory func(map[string]interface{}) (Database, error)
 
-var dbFactories = make(map[string]DBFactory)
-var dbFactoriesMu sync.Mutex
+var (
+	dbFactories             = make(map[string]DBFactory)
+	dbFactoriesMu           sync.Mutex
+	ErrRequiredParameters   = errors.New("required parameters not set")
+	ErrUnsupportedOperation = errors.New("unsupported operation")
+)
 
 func RegisterFactory(name string, n DBFactory) {
 	dbFactoriesMu.Lock()
@@ -88,7 +92,7 @@ func Connect(driver string, params map[string]interface{}) (db Database, err err
 			err = errors.New("driver not registered")
 		}
 	} else {
-		err = errors.New("db options not provided")
+		err = ErrRequiredParameters
 	}
 	return
 }

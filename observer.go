@@ -80,7 +80,10 @@ type Observer struct {
 	stopped  chan interface{}
 }
 
-var logger = logging.MustGetLogger("observer")
+var (
+	logger           = logging.MustGetLogger("observer")
+	errActionsNotSet = errors.New("extract actions not set")
+)
 
 func ReadConfig(path string) (*Observer, error) {
 	var config Observer
@@ -106,7 +109,7 @@ func (cr *Observer) Init() error {
 			return err
 		}
 	} else {
-		return errors.New("extract actions not set")
+		return errActionsNotSet
 	}
 	logger.Debug("Initiating notifiers")
 	cr.producer, err = producer.New(cr.Producers, cr.db)

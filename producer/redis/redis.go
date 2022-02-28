@@ -30,7 +30,6 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/json"
-	"errors"
 	"github.com/go-redis/redis/v8"
 	"github.com/minio/sha256-simd"
 	"github.com/op/go-logging"
@@ -91,7 +90,7 @@ func (r Notifier) New(configPath string, _ s.Database) (producer.Producer, error
 				})
 				err = n.con.Ping(ctx).Err()
 			} else {
-				err = errors.New("required parameters not set")
+				err = s.ErrRequiredParameters
 			}
 		}
 	}

@@ -48,7 +48,10 @@ const (
 	TmplHash = "hash"
 )
 
-var logger = logging.MustGetLogger("file")
+var (
+	logger         = logging.MustGetLogger("file")
+	errInvalidPath = errors.New("invalid path")
+)
 
 func init() {
 	producer.RegisterFactory("file", Notifier{})
@@ -79,7 +82,7 @@ func (_ Notifier) New(configPath string, _ s.Database) (producer.Producer, error
 						}
 					}
 				} else {
-					err = errors.New("invalid path")
+					err = errInvalidPath
 				}
 			}
 		}

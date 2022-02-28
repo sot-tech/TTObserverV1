@@ -42,6 +42,8 @@ import (
 	"strings"
 )
 
+var ErrInvalidImageURL = errors.New("invalid image url")
+
 type TorrentInfo struct {
 	Id     int64
 	Name   string
@@ -155,7 +157,7 @@ func GetTorrentPoster(imageUrl string, maxSize uint) (error, []byte) {
 			err = buildError(resp, httpErr, "get poster")
 		}
 	} else {
-		err = errors.New("invalid image url")
+		err = ErrInvalidImageURL
 	}
 	return err, torrentImage
 }
