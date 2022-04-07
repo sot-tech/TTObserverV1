@@ -27,17 +27,34 @@
 package main
 
 import (
+	cr "crypto/rand"
 	"flag"
 	"github.com/op/go-logging"
 	"io"
+	"math/rand"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"sot-te.ch/TTObserverV1"
 	"syscall"
+	"time"
 )
 
 var logger = logging.MustGetLogger("main")
+
+func init() {
+	//Seeding math random
+	r := make([]byte, 0, 8)
+	var seed int64
+	if _, err := cr.Read(r); err == nil {
+		logger.Error("Unable to read system random data: ", err)
+		seed = time.Now().UnixNano()
+	} else {
+		seed = int64(r[0])<<56 | int64(r[1])<<48 | int64(r[2])<<40 | int64(r[3])<<32 |
+			int64(r[4])<<24 | int64(r[5])<<16 | int64(r[6])<<8 | int64(r[7])
+	}
+	rand.Seed(seed)
+}
 
 func main() {
 	configPath := flag.String("c", "/etc/ttobserver/main.json", "config path")

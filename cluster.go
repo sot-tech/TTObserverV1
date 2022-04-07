@@ -28,7 +28,6 @@ package TTObserver
 
 import (
 	"bytes"
-	cr "crypto/rand"
 	"errors"
 	"github.com/nats-io/nats.go"
 	"math/rand"
@@ -55,18 +54,10 @@ const (
 	idLen               = 8
 )
 
-var (
-	ownId = make([]byte, idLen)
-)
+var NodeId = make([]byte, idLen)
 
 func init() {
-	//Sometimes the same ID is generated so using secure random
-	if _, err := cr.Read(ownId); err != nil {
-		logger.Panic(err)
-	}
-	seed := int64(ownId[0])<<56 | int64(ownId[1])<<48 | int64(ownId[2])<<40 | int64(ownId[3])<<32 |
-		int64(ownId[4])<<24 | int64(ownId[5])<<16 | int64(ownId[6])<<8 | int64(ownId[7])
-	rand.Seed(seed)
+	rand.Read(NodeId)
 }
 
 func (cl *Cluster) Start() error {
@@ -91,7 +82,7 @@ func (cl *Cluster) Start() error {
 		for {
 			select {
 			default:
-				if resp, err = cl.client.Request(cl.MasterSubject, ownId, cl.MaxWait*time.Millisecond); err == nil {
+				if resp, err = cl.client.Request(cl.MasterSubject, NodeId, cl.MaxWait*time.Millisecond); err == nil {
 					if errorCount > 0 {
 						logger.Notice("Master alive, id: ", resp.Data)
 						errorCount = 0
@@ -120,15 +111,15 @@ func (cl *Cluster) Start() error {
 
 func (cl *Cluster) asMaster() error {
 	var err error
-	logger.Info("Begin master propose, my id: ", ownId)
+	logger.Info("Begin master propose, my id: ", NodeId)
 	if cl.proposedSub, err = cl.client.Subscribe(cl.ProposeSubject, respondId); err == nil {
 		defer cl.unsubPropose()
 		var resp *nats.Msg
-		if resp, err = cl.client.Request(cl.ProposeSubject, ownId, cl.MaxWait*time.Millisecond); err == nil {
+		if resp, err = cl.client.Request(cl.ProposeSubject, NodeId, cl.MaxWait*time.Millisecond); err == nil {
 			logger.Notice("Found another master propose from node: ", resp.Data)
 		} else if cl.noResponders(err) {
 			err = nil
-			logger.Notice("Become a master, my id: ", ownId)
+			logger.Notice("Become a master, my id: ", NodeId)
 			if cl.masterSub, err = cl.client.Subscribe(cl.MasterSubject, respondId); err == nil {
 				defer cl.unsubMaster()
 				err = cl.StartFn()
@@ -143,9 +134,9 @@ func (cl Cluster) noResponders(err error) bool {
 }
 
 func respondId(msg *nats.Msg) {
-	if msg != nil && !bytes.Equal(ownId, msg.Data) {
+	if msg != nil && !bytes.Equal(NodeId, msg.Data) {
 		logger.Debug("Received message from node: ", msg.Data)
-		if err := msg.Respond(ownId); err != nil {
+		if err := msg.Respond(NodeId); err != nil {
 			logger.Error(err)
 		}
 	}
