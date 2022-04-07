@@ -42,18 +42,21 @@ const (
 	ParamPassword = "password"
 	ParamDB       = "db"
 
-	prefix       = "tt_"
-	sChat        = prefix + "chat"
-	sAdmin       = prefix + "adm"
-	hConfOffset  = prefix + "offset"
-	hTorrent     = prefix + "t_"
-	hTorrentId   = prefix + "ti"
-	hTorrentFile = hTorrent + "f_"
-	hTorrentMeta = hTorrent + "m_"
-	pIndex       = "idx"
-	pName        = "name"
-	pData        = "data"
-	pImage       = "img"
+	sChat  = "tt_chat"
+	sAdmin = "tt_adm"
+
+	kConfOffset   = "tt_offset"
+	kTorrentIndex = "tt_idx"
+
+	hTorrentId   = "tt_ti"
+	hTorrent     = "tt_t_"
+	hTorrentFile = "tt_f_"
+	hTorrentMeta = "tt_m_"
+
+	fIndex = "idx"
+	fName  = "name"
+	fData  = "data"
+	fImage = "img"
 )
 
 type database struct {
@@ -103,7 +106,7 @@ func (d database) AddChat(chat int64) error {
 
 func (d database) AddTorrentImage(id int64, image []byte) (err error) {
 	if len(image) > 0 {
-		err = d.con.HSet(ctx, hTorrent+strconv.FormatInt(id, 10), pImage, image).Err()
+		err = d.con.HSet(ctx, hTorrent+strconv.FormatInt(id, 10), fImage, image).Err()
 	}
 	return
 }
@@ -122,13 +125,13 @@ func (d database) AddTorrentMeta(id int64, meta map[string]string) (err error) {
 
 func (d database) AddTorrent(name string, data []byte, files []string) (id int64, err error) {
 	hkey := hTorrent + name
-	if err = d.con.HSet(ctx, hkey, pName, name, pData, data).Err(); err == nil {
+	if err = d.con.HSet(ctx, hkey, fName, name, fData, data).Err(); err == nil {
 		var sid string
-		if sid, err = d.con.HGet(ctx, hkey, pIndex).Result(); err == nil || asNil(err) == nil {
+		if sid, err = d.con.HGet(ctx, hkey, fIndex).Result(); err == nil || asNil(err) == nil {
 			if len(sid) == 0 {
-				if id, err = d.con.Incr(ctx, hTorrent+pIndex).Result(); err == nil {
+				if id, err = d.con.Incr(ctx, kTorrentIndex).Result(); err == nil {
 					sid = strconv.FormatInt(id, 10)
-					if err = d.con.HSet(ctx, hkey, pIndex, sid).Err(); err == nil {
+					if err = d.con.HSet(ctx, hkey, fIndex, sid).Err(); err == nil {
 						err = d.con.HSet(ctx, hTorrentId, sid, hkey).Err()
 					}
 				}
@@ -156,7 +159,7 @@ func (d database) AddTorrent(name string, data []byte, files []string) (id int64
 }
 
 func (d database) CheckTorrent(id int64) (bool, error) {
-	return d.con.HExists(ctx, hTorrent+strconv.FormatInt(id, 10), pName).Result()
+	return d.con.HExists(ctx, hTorrentId, strconv.FormatInt(id, 10)).Result()
 }
 
 func (d *database) Close() {
@@ -212,7 +215,7 @@ func (d database) GetChats() (out []int64, err error) {
 }
 
 func (d database) GetCrawlOffset() (uint, error) {
-	out, err := d.con.Get(ctx, hConfOffset).Uint64()
+	out, err := d.con.Get(ctx, kConfOffset).Uint64()
 	err = asNil(err)
 	return uint(out), err
 }
@@ -224,7 +227,7 @@ func (d database) GetTorrentFiles(torrent int64) ([]string, error) {
 }
 
 func (d database) GetTorrentImage(id int64) ([]byte, error) {
-	data, err := d.con.HGet(ctx, hTorrent+strconv.FormatInt(id, 10), pImage).Bytes()
+	data, err := d.con.HGet(ctx, hTorrent+strconv.FormatInt(id, 10), fImage).Bytes()
 	err = asNil(err)
 	return data, err
 }
@@ -238,7 +241,7 @@ func (d database) GetTorrentMeta(id int64) (map[string]string, error) {
 func (d database) GetTorrent(torrent string) (id int64, err error) {
 	id = s.InvalidDBId
 	var sid string
-	if sid, err = d.con.HGet(ctx, hTorrent+torrent, pIndex).Result(); err == nil {
+	if sid, err = d.con.HGet(ctx, hTorrent+torrent, fIndex).Result(); err == nil {
 		id, err = strconv.ParseInt(sid, 10, 64)
 	} else {
 		err = asNil(err)
@@ -247,7 +250,7 @@ func (d database) GetTorrent(torrent string) (id int64, err error) {
 }
 
 func (d database) UpdateCrawlOffset(offset uint) error {
-	return d.con.Set(ctx, hConfOffset, strconv.FormatUint(uint64(offset), 10), 0).Err()
+	return d.con.Set(ctx, kConfOffset, strconv.FormatUint(uint64(offset), 10), 0).Err()
 }
 
 func (_ database) MGetTorrents() ([]s.DBTorrent, error) {
@@ -256,7 +259,7 @@ func (_ database) MGetTorrents() ([]s.DBTorrent, error) {
 
 func (d database) MPutTorrent(t s.DBTorrent, fs []string) (err error) {
 	hKey := hTorrent + t.Name
-	if err = d.con.HSet(ctx, hKey, pName, t.Name, pData, t.Data, pImage, t.Image).Err(); err == nil {
+	if err = d.con.HSet(ctx, hKey, fName, t.Name, fData, t.Data, fImage, t.Image).Err(); err == nil {
 		sid := strconv.FormatInt(t.Id, 10)
 		l := len(fs)
 		if l > 0 {
@@ -269,7 +272,7 @@ func (d database) MPutTorrent(t s.DBTorrent, fs []string) (err error) {
 		}
 		if err == nil {
 			if err = d.con.HSet(ctx, hTorrentId, sid, hKey).Err(); err == nil {
-				err = d.con.Set(ctx, hTorrent+pIndex, sid, 0).Err()
+				err = d.con.Set(ctx, kTorrentIndex, sid, 0).Err()
 			}
 		}
 	}
