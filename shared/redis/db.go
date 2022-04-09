@@ -50,14 +50,16 @@ const (
 
 	hTorrentId   = "tt_ti"
 	hTorrent     = "tt_t_"
-	hTorrentFile = "tt_f_"
-	hTorrentMeta = "tt_m_"
+	hTorrentFile = "tt_t_f_"
+	hTorrentMeta = "tt_t_m_"
 
 	fIndex = "idx"
 	fName  = "name"
 	fData  = "data"
 	fImage = "img"
 )
+
+var ErrTorrentNotFound = errors.New("unable to find torrent hash by id")
 
 type database struct {
 	con *redis.Client
@@ -106,8 +108,16 @@ func (d database) AddChat(chat int64) error {
 
 func (d database) AddTorrentImage(id int64, image []byte) (err error) {
 	if len(image) > 0 {
-		err = d.con.HSet(ctx, hTorrent+strconv.FormatInt(id, 10), fImage, image).Err()
+		var hash string
+		if hash, err = d.con.HGet(ctx, hTorrentId, strconv.FormatInt(id, 10)).Result(); err == nil || asNil(err) == nil {
+			if len(hash) > 0 {
+				err = d.con.HSet(ctx, hash, fImage, image).Err()
+			} else {
+				err = ErrTorrentNotFound
+			}
+		}
 	}
+	err = asNil(err)
 	return
 }
 
@@ -220,14 +230,23 @@ func (d database) GetCrawlOffset() (uint, error) {
 	return uint(out), err
 }
 
-func (d database) GetTorrentFiles(torrent int64) ([]string, error) {
-	out, err := d.con.SMembers(ctx, hTorrentFile+strconv.FormatInt(torrent, 10)).Result()
+func (d database) GetTorrentFiles(id int64) ([]string, error) {
+	out, err := d.con.SMembers(ctx, hTorrentFile+strconv.FormatInt(id, 10)).Result()
 	err = asNil(err)
 	return out, err
 }
 
 func (d database) GetTorrentImage(id int64) ([]byte, error) {
-	data, err := d.con.HGet(ctx, hTorrent+strconv.FormatInt(id, 10), fImage).Bytes()
+	var err error
+	var hash string
+	var data []byte
+	if hash, err = d.con.HGet(ctx, hTorrentId, strconv.FormatInt(id, 10)).Result(); err == nil || asNil(err) == nil {
+		if len(hash) > 0 {
+			data, err = d.con.HGet(ctx, hash, fImage).Bytes()
+		} else {
+			err = ErrTorrentNotFound
+		}
+	}
 	err = asNil(err)
 	return data, err
 }
@@ -238,10 +257,10 @@ func (d database) GetTorrentMeta(id int64) (map[string]string, error) {
 	return out, err
 }
 
-func (d database) GetTorrent(torrent string) (id int64, err error) {
+func (d database) GetTorrent(name string) (id int64, err error) {
 	id = s.InvalidDBId
 	var sid string
-	if sid, err = d.con.HGet(ctx, hTorrent+torrent, fIndex).Result(); err == nil {
+	if sid, err = d.con.HGet(ctx, hTorrent+name, fIndex).Result(); err == nil {
 		id, err = strconv.ParseInt(sid, 10, 64)
 	} else {
 		err = asNil(err)
