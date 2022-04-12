@@ -33,7 +33,7 @@ import (
 
 const InvalidDBId = -1
 
-type DBFactory func(map[string]interface{}) (Database, error)
+type DBFactory func(map[string]any) (Database, error)
 
 var (
 	dbFactories             = make(map[string]DBFactory)
@@ -84,7 +84,7 @@ type Database interface {
 	MPutTorrent(torrent DBTorrent, files []string) error
 }
 
-func Connect(driver string, params map[string]interface{}) (db Database, err error) {
+func Connect(driver string, params map[string]any) (db Database, err error) {
 	if len(driver) > 0 && params != nil {
 		if fac := dbFactories[driver]; fac != nil {
 			db, err = fac(params)

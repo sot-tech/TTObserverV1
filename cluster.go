@@ -46,7 +46,7 @@ type Cluster struct {
 	SuspendFn              func()        `json:"-"`
 	client                 *nats.Conn
 	masterSub, proposedSub *nats.Subscription
-	stopped                chan interface{}
+	stopped                chan any
 }
 
 const (
@@ -76,7 +76,7 @@ func (cl *Cluster) Start() error {
 	}
 	var err error
 	if cl.client, err = nats.Connect(cl.NatsURL, clientOpts...); err == nil {
-		cl.stopped = make(chan interface{})
+		cl.stopped = make(chan any)
 		var errorCount uint32 = 0
 		var resp *nats.Msg
 		for {

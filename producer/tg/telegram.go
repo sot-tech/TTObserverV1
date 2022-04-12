@@ -146,7 +146,7 @@ func (tg Notifier) getState(chat int64) (string, error) {
 	if index, err = tg.db.GetCrawlOffset(); err != nil {
 		return "", err
 	}
-	return producer.FormatMessage(tg.messages.state, map[string]interface{}{
+	return producer.FormatMessage(tg.messages.state, map[string]any{
 		msgWatch:          isMob,
 		msgAdmin:          isAdmin,
 		producer.MsgIndex: index,
@@ -165,7 +165,7 @@ func (tg Notifier) uploadPoster(chat int64, args []string) error {
 			if exist, err = tg.db.CheckTorrent(torrentId); err == nil {
 				if exist {
 					var torrentPoster []byte
-					if err, torrentPoster = s.GetTorrentPoster(args[1], 0); err == nil {
+					if torrentPoster, err = s.GetTorrentPoster(args[1], 0); err == nil {
 						if err = tg.db.AddTorrentImage(torrentId, torrentPoster); err == nil {
 							tg.client.SendMsg(tg.Messages.Added, []int64{chat}, false)
 						}
@@ -268,7 +268,7 @@ func (tg Notifier) sendMsgToMobs(msg string, photo []byte) {
 	}
 }
 
-func (_ Notifier) New(configPath string, db s.Database) (producer.Producer, error) {
+func (Notifier) New(configPath string, db s.Database) (producer.Producer, error) {
 	var err error
 	n := &Notifier{db: db}
 	var confBytes []byte
@@ -302,7 +302,7 @@ func (tg Notifier) Send(new bool, torrent *s.TorrentInfo) {
 		if err != nil {
 			logger.Error(err)
 		}
-		if msg, err := producer.FormatMessage(tg.messages.announce, map[string]interface{}{
+		if msg, err := producer.FormatMessage(tg.messages.announce, map[string]any{
 			producer.MsgAction:     action,
 			producer.MsgName:       name,
 			producer.MsgSize:       producer.FormatFileSize(torrent.Length),
@@ -323,7 +323,7 @@ func (tg Notifier) SendNxGet(offset uint) {
 		logger.Warning("Nx message not set")
 	} else {
 		logger.Debugf("Notifying %d GET", offset)
-		if msg, err := producer.FormatMessage(tg.messages.nx, map[string]interface{}{
+		if msg, err := producer.FormatMessage(tg.messages.nx, map[string]any{
 			producer.MsgIndex: offset,
 		}); err == nil {
 			tg.sendMsgToMobs(msg, nil)

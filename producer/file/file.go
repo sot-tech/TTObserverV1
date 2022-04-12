@@ -64,7 +64,7 @@ type Notifier struct {
 	perm         uint64
 }
 
-func (_ Notifier) New(configPath string, _ s.Database) (producer.Producer, error) {
+func (Notifier) New(configPath string, _ s.Database) (producer.Producer, error) {
 	var err error
 	n := new(Notifier)
 	var confBytes []byte
@@ -96,7 +96,7 @@ func (fl Notifier) Send(_ bool, torrent *s.TorrentInfo) {
 	hash := sha1.New()
 	hash.Write([]byte(torrent.Name))
 
-	if fileName, err = producer.FormatMessage(fl.nameTemplate, map[string]interface{}{
+	if fileName, err = producer.FormatMessage(fl.nameTemplate, map[string]any{
 		producer.MsgName: torrent.Name,
 		TmplId:           torrent.Id,
 		TmplHash:         base64.RawURLEncoding.EncodeToString(hash.Sum(nil)),
@@ -112,6 +112,6 @@ func (fl Notifier) Send(_ bool, torrent *s.TorrentInfo) {
 	}
 }
 
-func (_ Notifier) Close() {}
+func (Notifier) Close() {}
 
-func (_ Notifier) SendNxGet(uint) {}
+func (Notifier) SendNxGet(uint) {}

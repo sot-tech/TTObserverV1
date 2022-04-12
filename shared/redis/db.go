@@ -73,7 +73,7 @@ func asNil(err error) error {
 }
 
 func init() {
-	s.RegisterFactory(DBDriver, func(m map[string]interface{}) (s.Database, error) {
+	s.RegisterFactory(DBDriver, func(m map[string]any) (s.Database, error) {
 		var err error
 		var db *database
 		if v, ok := m[ParamAddress]; ok && v != nil {
@@ -124,7 +124,7 @@ func (d database) AddTorrentImage(id int64, image []byte) (err error) {
 func (d database) AddTorrentMeta(id int64, meta map[string]string) (err error) {
 	l := len(meta)
 	if l > 0 {
-		m := make(map[string]interface{}, l)
+		m := make(map[string]any, l)
 		for k, v := range meta {
 			m[k] = v
 		}
@@ -157,7 +157,7 @@ func (d database) AddTorrent(name string, data []byte, files []string) (id int64
 			}
 			l := len(files)
 			if l > 0 {
-				ifs := make([]interface{}, l)
+				ifs := make([]any, l)
 				for i := 0; i < l; i++ {
 					ifs[i] = files[i]
 				}
@@ -272,7 +272,7 @@ func (d database) UpdateCrawlOffset(offset uint) error {
 	return d.con.Set(ctx, kConfOffset, strconv.FormatUint(uint64(offset), 10), 0).Err()
 }
 
-func (_ database) MGetTorrents() ([]s.DBTorrent, error) {
+func (database) MGetTorrents() ([]s.DBTorrent, error) {
 	return nil, s.ErrUnsupportedOperation
 }
 
@@ -283,7 +283,7 @@ func (d database) MPutTorrent(t s.DBTorrent, fs []string) (err error) {
 		l := len(fs)
 		if l > 0 {
 			fKey := hTorrentFile + sid
-			ifs := make([]interface{}, l)
+			ifs := make([]any, l)
 			for i := 0; i < l; i++ {
 				ifs[i] = fs[i]
 			}

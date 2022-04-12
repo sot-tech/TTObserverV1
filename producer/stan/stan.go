@@ -139,4 +139,4 @@ func (st *Notifier) Close() {
 	}
 }
 
-func (_ Notifier) SendNxGet(uint) {}
+func (Notifier) SendNxGet(uint) {}

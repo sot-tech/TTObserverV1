@@ -125,7 +125,7 @@ func (r Notifier) Send(isNew bool, t *s.TorrentInfo) {
 	torrent := new(torrent)
 	var err error
 	if err = bencode.DecodeBytes(t.Data, torrent); err == nil {
-		values := make([]interface{}, 0, 6)
+		values := make([]any, 0, 6)
 		s1 := sha1.New()
 		s1.Write(torrent.Info)
 		values = append(values, string(s1.Sum(nil)), t.Name)
@@ -155,4 +155,4 @@ func (r *Notifier) Close() {
 	}
 }
 
-func (_ Notifier) SendNxGet(uint) {}
+func (Notifier) SendNxGet(uint) {}

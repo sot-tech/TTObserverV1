@@ -71,13 +71,13 @@ type Observer struct {
 	} `json:"crawler"`
 	Producers []producer.Config `json:"producers"`
 	DB        struct {
-		Driver     string                 `json:"driver"`
-		Parameters map[string]interface{} `json:"params"`
+		Driver     string         `json:"driver"`
+		Parameters map[string]any `json:"params"`
 	} `json:"db"`
 	Cluster  Cluster `json:"cluster"`
 	db       s.Database
 	producer *producer.Announcer
-	stopped  chan interface{}
+	stopped  chan any
 }
 
 var (
@@ -118,7 +118,7 @@ func (cr *Observer) Init() error {
 			logger.Info("Delay time set to 0, falling back to ", delay)
 			cr.Crawler.Delay = delay
 		}
-		cr.stopped = make(chan interface{}, 1)
+		cr.stopped = make(chan any, 1)
 	}
 	return err
 }
@@ -258,10 +258,10 @@ func (cr Observer) Notify(torrent *s.TorrentInfo, context string, isNew bool) {
 			if len(torrentImage) == 0 || existingMeta[cr.Crawler.ImageMetaField] != torrentImageUrl {
 				if len(torrentImageUrl) > 0 {
 					logger.Info("Reloading torrent image")
-					if strings.Index(torrentImageUrl, cr.Crawler.BaseURL) < 0 {
+					if !strings.Contains(torrentImageUrl, cr.Crawler.BaseURL) {
 						torrentImageUrl = cr.Crawler.BaseURL + torrentImageUrl
 					}
-					if err, torrentImage = s.GetTorrentPoster(torrentImageUrl, cr.Crawler.ImageThumb); err == nil {
+					if torrentImage, err = s.GetTorrentPoster(torrentImageUrl, cr.Crawler.ImageThumb); err == nil {
 						err = cr.db.AddTorrentImage(torrent.Id, torrentImage)
 					}
 				}

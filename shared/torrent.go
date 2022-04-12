@@ -131,7 +131,7 @@ func GetTorrent(url string) (*TorrentInfo, error) {
 	return res, err
 }
 
-func GetTorrentPoster(imageUrl string, maxSize uint) (error, []byte) {
+func GetTorrentPoster(imageUrl string, maxSize uint) ([]byte, error) {
 	var err error
 	var torrentImage []byte
 	if len(imageUrl) > 0 {
@@ -159,7 +159,7 @@ func GetTorrentPoster(imageUrl string, maxSize uint) (error, []byte) {
 	} else {
 		err = ErrInvalidImageURL
 	}
-	return err, torrentImage
+	return torrentImage, err
 }
 
 func buildError(resp *http.Response, httpErr error, desc string) error {

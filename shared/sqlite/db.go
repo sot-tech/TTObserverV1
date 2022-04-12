@@ -70,7 +70,7 @@ const (
 )
 
 func init() {
-	s.RegisterFactory(DBDriver, func(m map[string]interface{}) (s.Database, error) {
+	s.RegisterFactory(DBDriver, func(m map[string]any) (s.Database, error) {
 		var err error
 		var db *database
 		if v, exist := m[ParamPath]; exist && v != nil {
@@ -84,16 +84,6 @@ func init() {
 		}
 		return db, err
 	})
-}
-
-func Connect(path string) (*database, error) {
-	var err error
-	var db database
-	db.con, err = sql.Open(DBDriver, path)
-	if err == nil {
-		err = db.checkConnection()
-	}
-	return &db, err
 }
 
 type database struct {
@@ -110,7 +100,7 @@ func (db database) checkConnection() error {
 	return err
 }
 
-func (db database) getNotEmpty(query string, args ...interface{}) (bool, error) {
+func (db database) getNotEmpty(query string, args ...any) (bool, error) {
 	val := false
 	var err error
 	err = db.checkConnection()
@@ -129,7 +119,7 @@ func (db database) GetChatExist(chat int64) (bool, error) {
 	return db.getNotEmpty(existChat, chat)
 }
 
-func (db database) execNoResult(query string, args ...interface{}) error {
+func (db database) execNoResult(query string, args ...any) error {
 	var err error
 	err = db.checkConnection()
 	if err == nil {
@@ -138,7 +128,7 @@ func (db database) execNoResult(query string, args ...interface{}) error {
 	return err
 }
 
-func (db database) getIntArray(query string, args ...interface{}) ([]int64, error) {
+func (db database) getIntArray(query string, args ...any) ([]int64, error) {
 	arr := make([]int64, 0)
 	var err error
 	err = db.checkConnection()
@@ -373,6 +363,6 @@ func (db database) MGetTorrents() (out []s.DBTorrent, err error) {
 	return
 }
 
-func (_ database) MPutTorrent(_ s.DBTorrent, _ []string) error {
+func (database) MPutTorrent(_ s.DBTorrent, _ []string) error {
 	return s.ErrUnsupportedOperation
 }

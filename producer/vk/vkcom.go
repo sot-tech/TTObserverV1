@@ -83,7 +83,7 @@ type Notifier struct {
 	db            s.Database
 }
 
-func (_ Notifier) New(configPath string, db s.Database) (producer.Producer, error) {
+func (Notifier) New(configPath string, db s.Database) (producer.Producer, error) {
 	var err error
 	n := &Notifier{db: db}
 	var confBytes []byte
@@ -208,7 +208,7 @@ func (vk Notifier) Send(isNew bool, torrent *s.TorrentInfo) {
 					if err != nil {
 						logger.Error(err)
 					}
-					if msg, err := producer.FormatMessage(vk.Messages.announceTmpl, map[string]interface{}{
+					if msg, err := producer.FormatMessage(vk.Messages.announceTmpl, map[string]any{
 						producer.MsgAction:     action,
 						producer.MsgName:       name,
 						producer.MsgSize:       producer.FormatFileSize(torrent.Length),
@@ -245,7 +245,7 @@ func (vk Notifier) SendNxGet(offset uint) {
 		if vk.client != nil {
 			for _, groupId := range vk.GroupIds {
 				logger.Debugf("Notifying %d GET", offset)
-				if msg, err := producer.FormatMessage(vk.Messages.nxTmpl, map[string]interface{}{
+				if msg, err := producer.FormatMessage(vk.Messages.nxTmpl, map[string]any{
 					producer.MsgIndex: offset,
 				}); err == nil {
 					params := vkapi.WallPostParams{
@@ -265,4 +265,4 @@ func (vk Notifier) SendNxGet(offset uint) {
 	}
 }
 
-func (_ Notifier) Close() {}
+func (Notifier) Close() {}

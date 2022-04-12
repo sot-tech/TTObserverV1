@@ -53,7 +53,7 @@ var (
 	ErrTemplateNotSet = errors.New("template not initiated")
 )
 
-func FormatMessage(tmpl *template.Template, values map[string]interface{}) (string, error) {
+func FormatMessage(tmpl *template.Template, values map[string]any) (string, error) {
 	var err error
 	var res string
 	if tmpl != nil {
@@ -124,7 +124,7 @@ func FormatIndexesMessage(idxs []int, singleMsgTmpl, mulMsgTmpl *template.Templa
 			isFirst = false
 			sb.WriteString(strconv.Itoa(i))
 		}
-		msg, err = FormatMessage(tmpl, map[string]interface{}{
+		msg, err = FormatMessage(tmpl, map[string]any{
 			placeholder: sb.String(),
 		})
 	}
