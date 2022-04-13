@@ -29,10 +29,12 @@ package TTObserver
 import (
 	"bytes"
 	"errors"
-	"github.com/nats-io/nats.go"
 	"math/rand"
-	"sot-te.ch/TTObserverV1/shared"
 	"time"
+
+	"github.com/nats-io/nats.go"
+
+	"sot-te.ch/TTObserverV1/shared"
 )
 
 type Cluster struct {
@@ -118,7 +120,6 @@ func (cl *Cluster) asMaster() error {
 		if resp, err = cl.client.Request(cl.ProposeSubject, NodeId, cl.MaxWait*time.Millisecond); err == nil {
 			logger.Notice("Found another master propose from node: ", resp.Data)
 		} else if cl.noResponders(err) {
-			err = nil
 			logger.Notice("Become a master, my id: ", NodeId)
 			if cl.masterSub, err = cl.client.Subscribe(cl.MasterSubject, respondId); err == nil {
 				defer cl.unsubMaster()
