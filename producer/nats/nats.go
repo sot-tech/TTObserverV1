@@ -30,19 +30,21 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
-	"github.com/nats-io/nats.go"
-	"github.com/op/go-logging"
 	"io/ioutil"
 	"path/filepath"
+	"time"
+
+	"github.com/nats-io/nats.go"
+	"github.com/op/go-logging"
+
 	"sot-te.ch/TTObserverV1/producer"
 	s "sot-te.ch/TTObserverV1/shared"
-	"time"
 )
 
 var logger = logging.MustGetLogger("nats")
 
 const (
-	maxMessageSize        = 10485760 //10 MiB
+	maxMessageSize        = 10485760 // 10 MiB
 	maxMessagesInBuffer   = 10
 	maxMessageAge         = 24 * time.Hour
 	msgErrAlreadyInUse    = "stream name already in use"

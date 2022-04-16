@@ -32,15 +32,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/op/go-logging"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
-	"sot-te.ch/TTObserverV1/producer"
-	s "sot-te.ch/TTObserverV1/shared"
 	"strconv"
 	tmpl "text/template"
+
+	"github.com/op/go-logging"
+
+	"sot-te.ch/TTObserverV1/producer"
+	s "sot-te.ch/TTObserverV1/shared"
 )
 
 const (

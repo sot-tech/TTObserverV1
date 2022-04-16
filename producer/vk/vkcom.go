@@ -31,17 +31,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/azzzak/vkapi"
-	"github.com/op/go-logging"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"path/filepath"
 	"regexp"
-	"sot-te.ch/TTObserverV1/producer"
-	s "sot-te.ch/TTObserverV1/shared"
 	"strings"
 	tmpl "text/template"
+
+	"github.com/azzzak/vkapi"
+	"github.com/op/go-logging"
+
+	"sot-te.ch/TTObserverV1/producer"
+	s "sot-te.ch/TTObserverV1/shared"
 )
 
 const (
@@ -58,7 +60,7 @@ func init() {
 }
 
 type Notifier struct {
-	//we need scopes: photos,wall,groups,offline
+	// we need scopes: photos,wall,groups,offline
 	Token           string `json:"token"`
 	GroupIds        []uint `json:"groupids"`
 	IgnoreUnchanged bool   `json:"ignoreunchanged"`
@@ -91,7 +93,7 @@ func (Notifier) New(configPath string, db s.Database) (producer.Producer, error)
 		if err = json.Unmarshal(confBytes, n); err == nil {
 			if len(n.Token) > 0 {
 				if len(n.IgnoreRegexp) == 0 {
-					n.ignorePattern = isEmptyRegexp //is empty
+					n.ignorePattern = isEmptyRegexp // is empty
 				} else {
 					n.ignorePattern, err = regexp.Compile(n.IgnoreRegexp)
 				}

@@ -29,21 +29,23 @@ package main
 import (
 	cr "crypto/rand"
 	"flag"
-	"github.com/op/go-logging"
 	"io"
 	"math/rand"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"sot-te.ch/TTObserverV1"
 	"syscall"
 	"time"
+
+	"github.com/op/go-logging"
+
+	"sot-te.ch/TTObserverV1"
 )
 
 var logger = logging.MustGetLogger("main")
 
 func init() {
-	//Seeding math random
+	// Seeding math random
 	r := make([]byte, 0, 8)
 	var seed int64
 	if _, err := cr.Read(r); err == nil {

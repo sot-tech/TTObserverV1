@@ -29,6 +29,7 @@ package producer
 import (
 	"errors"
 	"fmt"
+
 	tts "sot-te.ch/TTObserverV1/shared"
 )
 

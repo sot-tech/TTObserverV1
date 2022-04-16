@@ -31,14 +31,16 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"errors"
-	"github.com/nats-io/stan.go"
-	"github.com/op/go-logging"
 	"io/ioutil"
 	"path/filepath"
-	"sot-te.ch/TTObserverV1/producer"
-	s "sot-te.ch/TTObserverV1/shared"
 	"sync"
 	"time"
+
+	"github.com/nats-io/stan.go"
+	"github.com/op/go-logging"
+
+	"sot-te.ch/TTObserverV1/producer"
+	s "sot-te.ch/TTObserverV1/shared"
 )
 
 var (

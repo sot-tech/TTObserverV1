@@ -27,8 +27,9 @@
 package producer
 
 import (
-	tts "sot-te.ch/TTObserverV1/shared"
 	"sync"
+
+	tts "sot-te.ch/TTObserverV1/shared"
 )
 
 type Config struct {

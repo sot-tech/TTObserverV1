@@ -30,12 +30,14 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/json"
+	"io/ioutil"
+	"path/filepath"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/minio/sha256-simd"
 	"github.com/op/go-logging"
 	"github.com/zeebo/bencode"
-	"io/ioutil"
-	"path/filepath"
+
 	"sot-te.ch/TTObserverV1/producer"
 	s "sot-te.ch/TTObserverV1/shared"
 )
@@ -46,10 +48,11 @@ var (
 )
 
 const (
-	v1Field       = "v1"
-	v2Field       = "v2"
-	hybridField   = "v2to1"
-	hybridHashLen = 20
+	defaultNamePrefix = "TT_N_"
+	v1Field           = "v1"
+	v2Field           = "v2"
+	hybridField       = "v2to1"
+	hybridHashLen     = 20
 )
 
 func init() {
@@ -63,17 +66,18 @@ func (ba *BABencode) UnmarshalBencode(in []byte) error {
 	return nil
 }
 
-type torrent struct {
+type torrentStruct struct {
 	Info BABencode `bencode:"info"`
 }
 
 type Notifier struct {
-	Address     string `json:"address"`
-	Password    string `json:"password,omitempty"`
-	DB          int    `json:"db,omitempty"`
-	Hash        string `json:"hash"`
-	CalculateV2 bool   `json:"calculatev2"`
-	con         *redis.Client
+	Address       string `json:"address"`
+	Password      string `json:"password"`
+	DB            int    `json:"db"`
+	HashKey       string `json:"hashkey"`
+	NameKeyPrefix string `json:"namekeyprefix"`
+	CalculateV2   bool   `json:"calculatev2"`
+	con           *redis.Client
 }
 
 func (r Notifier) New(configPath string, _ s.Database) (producer.Producer, error) {
@@ -82,7 +86,7 @@ func (r Notifier) New(configPath string, _ s.Database) (producer.Producer, error
 	var confBytes []byte
 	if confBytes, err = ioutil.ReadFile(filepath.Clean(configPath)); err == nil {
 		if err = json.Unmarshal(confBytes, n); err == nil {
-			if len(n.Address) > 0 && len(n.Hash) > 0 {
+			if len(n.Address) > 0 && len(n.HashKey) > 0 {
 				n.con = redis.NewClient(&redis.Options{
 					Addr:     n.Address,
 					Password: n.Password,
@@ -92,37 +96,41 @@ func (r Notifier) New(configPath string, _ s.Database) (producer.Producer, error
 			} else {
 				err = s.ErrRequiredParameters
 			}
+			if len(n.NameKeyPrefix) == 0 {
+				logger.Warning("Name key prefix not set, using default: ", defaultNamePrefix)
+				n.NameKeyPrefix = defaultNamePrefix
+			}
 		}
 	}
 	return n, err
 }
 
 func (r Notifier) Send(isNew bool, t *s.TorrentInfo) {
+	torrentNameKey := r.NameKeyPrefix + t.Name
 	if !isNew {
-		if prevHashes, err := r.con.HMGet(ctx, t.Name, v1Field, v2Field, hybridField).Result(); err != nil {
+		if prevHashes, err := r.con.HMGet(ctx, torrentNameKey, v1Field, v2Field, hybridField).Result(); err != nil {
 			logger.Error(err)
 		} else {
 			if len(prevHashes) > 0 {
 				fields := make([]string, 0, len(prevHashes))
 				for _, h := range prevHashes {
 					if h != nil {
-						switch f := h.(type) {
-						case string:
+						if f, isOk := h.(string); isOk {
 							fields = append(fields, f)
-						default:
+						} else {
 							logger.Warning(h, " is not string type")
 						}
 					}
 				}
 				if len(fields) > 0 {
-					if err = r.con.HDel(ctx, r.Hash, fields...).Err(); err != nil {
+					if err = r.con.HDel(ctx, r.HashKey, fields...).Err(); err != nil {
 						logger.Error(err)
 					}
 				}
 			}
 		}
 	}
-	torrent := new(torrent)
+	torrent := new(torrentStruct)
 	var err error
 	if err = bencode.DecodeBytes(t.Data, torrent); err == nil {
 		values := make([]any, 0, 6)
@@ -135,13 +143,13 @@ func (r Notifier) Send(isNew bool, t *s.TorrentInfo) {
 			v2Sum := s2.Sum(nil)
 			values = append(values, string(v2Sum), t.Name, string(v2Sum[:hybridHashLen]), t.Name)
 		}
-		if err = r.con.HSet(ctx, r.Hash, values...).Err(); err == nil {
+		if err = r.con.HSet(ctx, r.HashKey, values...).Err(); err == nil {
 			values[0], values[1] = v1Field, values[0]
 			if r.CalculateV2 {
 				values[2], values[3] = v2Field, values[2]
 				values[4], values[5] = hybridField, values[4]
 			}
-			err = r.con.HSet(ctx, t.Name, values...).Err()
+			err = r.con.HSet(ctx, torrentNameKey, values...).Err()
 		}
 	}
 	if err != nil {

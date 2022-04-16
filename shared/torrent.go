@@ -29,9 +29,6 @@ package shared
 import (
 	"bytes"
 	"errors"
-	"github.com/nfnt/resize"
-	"github.com/zeebo/bencode"
-	_ "golang.org/x/image/webp"
 	"image"
 	_ "image/gif"
 	"image/jpeg"
@@ -40,6 +37,10 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+
+	"github.com/nfnt/resize"
+	"github.com/zeebo/bencode"
+	_ "golang.org/x/image/webp"
 )
 
 var ErrInvalidImageURL = errors.New("invalid image url")

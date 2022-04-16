@@ -1,6 +1,6 @@
 {
 	"apiid": 123456,
-	"apihash":"kqwrvonebe34283on3on",
+	"apihash": "kqwrvonebe34283on3on",
 	"bottoken": "123321:BOIBGvOUVUYVYBGIoiboiubib",
 	"dbpath": "/var/lib/tto/tgdb",
 	"filestorepath": "/tmp/tgf",

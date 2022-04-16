@@ -29,9 +29,11 @@ package sqlite
 import (
 	"database/sql"
 	"errors"
-	_ "github.com/mattn/go-sqlite3"
-	s "sot-te.ch/TTObserverV1/shared"
 	"strconv"
+
+	_ "github.com/mattn/go-sqlite3"
+
+	s "sot-te.ch/TTObserverV1/shared"
 )
 
 const (

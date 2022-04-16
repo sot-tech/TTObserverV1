@@ -30,11 +30,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/op/go-logging"
 	"sort"
 	"strconv"
 	"strings"
 	"text/template"
+
+	"github.com/op/go-logging"
 )
 
 const (

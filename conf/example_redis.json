@@ -2,6 +2,7 @@
 	"address": "localhost:6379",
 	"password": "",
 	"db": 0,
-	"hash": "SOME_REDIS_HASH",
+	"hashkey": "SOME_REDIS_HASH",
+	"namekeyprefix": "TT_N_",
 	"calculatev2": true
 }

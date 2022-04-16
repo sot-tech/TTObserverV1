@@ -30,11 +30,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/op/go-logging"
 	"html"
 	"io/ioutil"
 	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/op/go-logging"
 	"sot-te.ch/HTExtractor"
+
 	"sot-te.ch/TTObserverV1/producer"
 	_ "sot-te.ch/TTObserverV1/producer/file"
 	_ "sot-te.ch/TTObserverV1/producer/nats"
@@ -45,8 +49,6 @@ import (
 	s "sot-te.ch/TTObserverV1/shared"
 	_ "sot-te.ch/TTObserverV1/shared/redis"
 	_ "sot-te.ch/TTObserverV1/shared/sqlite"
-	"strings"
-	"time"
 )
 
 const delay = 5
