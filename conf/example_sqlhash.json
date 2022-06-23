@@ -1,0 +1,7 @@
+{
+	"driver": "postgres",
+	"address": "host=localhost port=1234 user=test password=test database=test",
+	"deletequery": "DELETE FROM TT_HASH WHERE NAME = $1",
+	"insertquery": "INSERT INTO TT_HASH (HASH, NAME) VALUES ($1, $2)",
+	"calculatev2": true
+}

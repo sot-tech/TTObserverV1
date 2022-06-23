@@ -84,6 +84,7 @@
 		"driver": "sqlite3",
 		"params": {
 			"dbfile": "/var/lib/tt/db.sqlite",
+			"dbaddress": "host=localhost port=1234 user=postgres database=test",
 			"address": "localhost:6379",
 			"password": "",
 			"db": 0

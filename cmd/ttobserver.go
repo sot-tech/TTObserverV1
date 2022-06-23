@@ -46,21 +46,23 @@ var logger = logging.MustGetLogger("main")
 
 func init() {
 	// Seeding math random
-	r := make([]byte, 0, 8)
+	r := make([]byte, 8)
 	var seed int64
 	if _, err := cr.Read(r); err == nil {
-		logger.Error("Unable to read system random data: ", err)
-		seed = time.Now().UnixNano()
-	} else {
 		seed = int64(r[0])<<56 | int64(r[1])<<48 | int64(r[2])<<40 | int64(r[3])<<32 |
 			int64(r[4])<<24 | int64(r[5])<<16 | int64(r[6])<<8 | int64(r[7])
+	} else {
+		logger.Error("Unable to read system random data: ", err)
+		seed = time.Now().UnixNano()
 	}
 	rand.Seed(seed)
 }
 
 func main() {
-	configPath := flag.String("c", "/etc/ttobserver/main.json", "config path")
-	m := flag.Bool("m", false, "migrate from sqlite DB to redis. Both DB properties must be provided")
+	configPath := flag.String("c", "/etc/ttobserver/main.json", "Config path")
+	m := flag.Bool("m", false, "Migrate from one DB driver to another. Both DB properties must be provided")
+	f := flag.String("f", "", "Driver name from what database extract data. Supported values: sqlite3, redis, postgres")
+	t := flag.String("t", "", "Driver name to what database import data. Supported values: sqlite3, redis, postgres")
 	flag.Parse()
 	tt, err := TTObserver.ReadConfig(*configPath)
 	if err != nil {
@@ -88,7 +90,12 @@ func main() {
 		println(err)
 	}
 	if *m {
-		migrate(tt)
+		if len(*f) > 0 && len(*t) > 0 {
+			migrate(tt, *f, *t)
+		} else {
+			println("'f' and 't' keys must be both provided")
+			os.Exit(1)
+		}
 	} else if len(tt.Cluster.NatsURL) > 0 {
 		startClustered(tt)
 	} else {

@@ -24,21 +24,24 @@
  * OF SUCH DAMAGE.
  */
 
-package sqlite
+package sqldb
 
 import (
 	"database/sql"
 	"errors"
 	"strconv"
 
+	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 
 	s "sot-te.ch/TTObserverV1/shared"
 )
 
 const (
-	DBDriver  = "sqlite3"
-	ParamPath = "dbfile"
+	SQLLiteDriver  = "sqlite3"
+	PgDriver       = "postgres"
+	dbFileParam    = "dbfile"
+	dbAddressParam = "dbaddress"
 
 	selectChats = "SELECT ID FROM TT_CHAT"
 	insertChat  = "INSERT INTO TT_CHAT(ID) VALUES ($1)"
@@ -54,6 +57,7 @@ const (
 
 	selectTorrentId       = "SELECT ID FROM TT_TORRENT WHERE NAME = $1"
 	existTorrent          = "SELECT 1 FROM TT_TORRENT WHERE ID = $1"
+	insertTorrent         = "INSERT INTO TT_TORRENT(ID, NAME, DATA, IMAGE) VALUES ($1, $2, $3, $4)"
 	insertOrUpdateTorrent = "INSERT INTO TT_TORRENT(NAME, DATA) VALUES ($1, $2) ON CONFLICT(NAME) DO UPDATE SET DATA = EXCLUDED.DATA"
 
 	selectTorrentMeta = "SELECT NAME, VALUE FROM TT_TORRENT_META WHERE TORRENT = $1"
@@ -72,20 +76,36 @@ const (
 )
 
 func init() {
-	s.RegisterFactory(DBDriver, func(m map[string]any) (s.Database, error) {
-		var err error
-		var db *database
-		if v, exist := m[ParamPath]; exist && v != nil {
-			db = new(database)
-			db.con, err = sql.Open(DBDriver, v.(string))
-			if err == nil {
-				err = db.checkConnection()
-			}
+	s.RegisterFactory(SQLLiteDriver, func(m map[string]any) (db s.Database, err error) {
+		if v, exist := m[dbFileParam]; exist && v != nil {
+			db, err = newDb(SQLLiteDriver, v.(string))
 		} else {
 			err = s.ErrRequiredParameters
 		}
-		return db, err
+		return
 	})
+	s.RegisterFactory(PgDriver, func(m map[string]any) (db s.Database, err error) {
+		if v, exist := m[dbAddressParam]; exist && v != nil {
+			db, err = newDb(PgDriver, v.(string))
+		} else {
+			err = s.ErrRequiredParameters
+		}
+		return
+	})
+}
+
+func newDb(driver, param string) (s.Database, error) {
+	var err error
+	var db *database
+	if len(param) > 0 {
+		db = new(database)
+		if db.con, err = sql.Open(driver, param); err == nil {
+			err = db.checkConnection()
+		}
+	} else {
+		err = s.ErrRequiredParameters
+	}
+	return db, err
 }
 
 type database struct {
@@ -365,6 +385,15 @@ func (db database) MGetTorrents() (out []s.DBTorrent, err error) {
 	return
 }
 
-func (database) MPutTorrent(_ s.DBTorrent, _ []string) error {
-	return s.ErrUnsupportedOperation
+func (db database) MPutTorrent(t s.DBTorrent, files []string) (err error) {
+	if err = db.checkConnection(); err == nil {
+		if err = db.execNoResult(insertTorrent, t.Id, t.Name, t.Data, t.Image); err == nil {
+			for _, f := range files {
+				if err = db.execNoResult(insertTorrentFile, t.Id, f); err != nil {
+					break
+				}
+			}
+		}
+	}
+	return
 }

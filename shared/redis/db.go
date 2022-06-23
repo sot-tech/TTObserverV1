@@ -293,8 +293,27 @@ func (d database) UpdateCrawlOffset(offset uint) error {
 	return d.con.Set(ctx, kConfOffset, strconv.FormatUint(uint64(offset), 10), 0).Err()
 }
 
-func (database) MGetTorrents() ([]s.DBTorrent, error) {
-	return nil, s.ErrUnsupportedOperation
+func (d database) MGetTorrents() (tt []s.DBTorrent, err error) {
+	var tMap map[string]string
+	if tMap, err = d.con.HGetAll(ctx, hTorrentId).Result(); asNil(err) == nil {
+
+		for sid, hKey := range tMap {
+			id, _ := strconv.ParseInt(sid, 10, 64)
+			t := s.DBTorrent{Id: id}
+			if t.Name, err = d.con.HGet(ctx, hKey, fName).Result(); asNil(err) != nil {
+				break
+			}
+			if t.Data, err = d.con.HGet(ctx, hKey, fData).Bytes(); asNil(err) != nil {
+				break
+			}
+			if t.Image, err = d.con.HGet(ctx, hKey, fImage).Bytes(); asNil(err) != nil {
+				break
+			}
+			tt = append(tt, t)
+		}
+	}
+	err = asNil(err)
+	return
 }
 
 func (d database) MPutTorrent(t s.DBTorrent, fs []string) error {

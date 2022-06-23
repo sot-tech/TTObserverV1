@@ -30,6 +30,7 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"path/filepath"
 	"time"
@@ -47,7 +48,6 @@ const (
 	maxMessageSize        = 10485760 // 10 MiB
 	maxMessagesInBuffer   = 10
 	maxMessageAge         = 24 * time.Hour
-	msgErrAlreadyInUse    = "stream name already in use"
 	msgErrTooManyReplicas = "insufficient resources"
 )
 
@@ -92,7 +92,7 @@ func (nc *Notifier) init() error {
 							logger.Warning("Replicas count must be between 1 and 5 (inclusive), using 1")
 							nc.ReplicasCount = 1
 						}
-						for ; nc.ReplicasCount > 0; nc.ReplicasCount-- {
+						for ; nc.ReplicasCount > 0; nc.ReplicasCount -= 2 {
 							if _, err = nc.js.AddStream(&nats.StreamConfig{
 								Name:       nc.Stream,
 								Subjects:   []string{nc.Subject},
@@ -100,8 +100,10 @@ func (nc *Notifier) init() error {
 								MaxAge:     maxMessageAge,
 								MaxMsgSize: maxMessageSize,
 								Replicas:   nc.ReplicasCount,
-							}); err == nil || err.Error() == msgErrAlreadyInUse {
+							}); err == nil || errors.Is(err, nats.ErrStreamNameAlreadyInUse) {
 								logger.Info("Created new stream: ", nc.Stream)
+								err = nil
+								break
 							} else if err.Error() == msgErrTooManyReplicas {
 								logger.Warning("Unable to create stream: ", nc.Stream, " error: ", err, " decreasing replicas count")
 							} else {

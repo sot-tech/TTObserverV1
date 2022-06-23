@@ -28,7 +28,9 @@ package shared
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"errors"
+	"hash"
 	"image"
 	_ "image/gif"
 	"image/jpeg"
@@ -38,6 +40,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/minio/sha256-simd"
 	"github.com/nfnt/resize"
 	"github.com/zeebo/bencode"
 	_ "golang.org/x/image/webp"
@@ -181,4 +184,32 @@ func buildError(resp *http.Response, httpErr error, desc string) error {
 		sb.WriteString(resp.Status)
 	}
 	return errors.New(sb.String())
+}
+
+type BencodeRawBytes []byte
+
+func (ba *BencodeRawBytes) UnmarshalBencode(in []byte) error {
+	*ba = append([]byte(nil), in...)
+	return nil
+}
+
+type torrentRawInfoStruct struct {
+	Info BencodeRawBytes `bencode:"info"`
+}
+
+func GenerateTorrentInfoHash(data []byte, v2 bool) (h1, h2 []byte, err error) {
+	torrent := new(torrentRawInfoStruct)
+	if err = bencode.DecodeBytes(data, torrent); err == nil {
+		var h hash.Hash
+		h = sha1.New()
+		h.Write(torrent.Info)
+		h1 = h.Sum(nil)
+		if v2 {
+			h = sha256.New()
+			h.Write(torrent.Info)
+			h2 = h.Sum(nil)
+		}
+
+	}
+	return
 }

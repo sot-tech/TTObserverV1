@@ -27,20 +27,20 @@
 package main
 
 import (
+	"sort"
+
 	"sot-te.ch/TTObserverV1"
 	s "sot-te.ch/TTObserverV1/shared"
-	"sot-te.ch/TTObserverV1/shared/redis"
-	"sot-te.ch/TTObserverV1/shared/sqlite"
 )
 
-func migrate(tt *TTObserver.Observer) {
+func migrate(tt *TTObserver.Observer, from, to string) {
 	var err error
 	var oldDb, newDb s.Database
-	if oldDb, err = s.Connect(sqlite.DBDriver, tt.DB.Parameters); err != nil {
+	if oldDb, err = s.Connect(from, tt.DB.Parameters); err != nil {
 		logger.Fatal("!Unable to connect to old database", err)
 	}
 	defer oldDb.Close()
-	if newDb, err = s.Connect(redis.DBDriver, tt.DB.Parameters); err != nil {
+	if newDb, err = s.Connect(to, tt.DB.Parameters); err != nil {
 		logger.Fatal("!Unable to connect to new database", err)
 	}
 	defer newDb.Close()
@@ -86,7 +86,14 @@ func migrate(tt *TTObserver.Observer) {
 		logger.Fatal("! Unable to get torrents", err)
 	} else {
 		if len(ts) > 0 {
+			sort.Slice(ts, func(i, j int) bool {
+				return ts[i].Id < ts[j].Id
+			})
+			unq := make(map[string]s.DBTorrent, len(ts))
 			for _, t := range ts {
+				unq[t.Name] = t
+			}
+			for _, t := range unq {
 				if fs, err := oldDb.GetTorrentFiles(t.Id); err != nil {
 					logger.Fatal("! Unable to get torrent ", t.Id, " files", err)
 				} else if err := newDb.MPutTorrent(t, fs); err != nil {
@@ -96,7 +103,7 @@ func migrate(tt *TTObserver.Observer) {
 				} else if err = newDb.AddTorrentMeta(t.Id, meta); err != nil {
 					logger.Fatal("! Unable to migrate torrent ", t.Id, " meta", err)
 				}
-				logger.Info("Torrent ", t.Id, " migrated")
+				logger.Info(". Torrent ", t.Id, " migrated")
 			}
 		} else {
 			logger.Warning("- There is no torrents to migrate")

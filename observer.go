@@ -48,7 +48,7 @@ import (
 	_ "sot-te.ch/TTObserverV1/producer/vk"
 	s "sot-te.ch/TTObserverV1/shared"
 	_ "sot-te.ch/TTObserverV1/shared/redis"
-	_ "sot-te.ch/TTObserverV1/shared/sqlite"
+	_ "sot-te.ch/TTObserverV1/shared/sqldb"
 )
 
 const delay = 5

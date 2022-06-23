@@ -34,9 +34,7 @@ import (
 	"path/filepath"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/minio/sha256-simd"
 	"github.com/op/go-logging"
-	"github.com/zeebo/bencode"
 
 	"sot-te.ch/TTObserverV1/producer"
 	s "sot-te.ch/TTObserverV1/shared"
@@ -52,22 +50,10 @@ const (
 	v1Field           = "v1"
 	v2Field           = "v2"
 	hybridField       = "v2to1"
-	hybridHashLen     = 20
 )
 
 func init() {
 	producer.RegisterFactory("redis", Notifier{})
-}
-
-type BABencode []byte
-
-func (ba *BABencode) UnmarshalBencode(in []byte) error {
-	*ba = append([]byte(nil), in...)
-	return nil
-}
-
-type torrentStruct struct {
-	Info BABencode `bencode:"info"`
 }
 
 type Notifier struct {
@@ -130,18 +116,13 @@ func (r Notifier) Send(isNew bool, t *s.TorrentInfo) {
 			}
 		}
 	}
-	torrent := new(torrentStruct)
 	var err error
-	if err = bencode.DecodeBytes(t.Data, torrent); err == nil {
-		values := make([]any, 0, 6)
-		s1 := sha1.New()
-		s1.Write(torrent.Info)
-		values = append(values, string(s1.Sum(nil)), t.Name)
+	values := make([]any, 0, 6)
+	var h1, h2 []byte
+	if h1, h2, err = s.GenerateTorrentInfoHash(t.Data, r.CalculateV2); err == nil {
+		values = append(values, string(h1), t.Name)
 		if r.CalculateV2 {
-			s2 := sha256.New()
-			s2.Write(torrent.Info)
-			v2Sum := s2.Sum(nil)
-			values = append(values, string(v2Sum), t.Name, string(v2Sum[:hybridHashLen]), t.Name)
+			values = append(values, string(h2), t.Name, string(h2[:sha1.Size]), t.Name)
 		}
 		if err = r.con.HSet(ctx, r.HashKey, values...).Err(); err == nil {
 			values[0], values[1] = v1Field, values[0]
