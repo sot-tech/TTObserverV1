@@ -81,6 +81,7 @@ func (d DB) Send(_ bool, t *s.TorrentInfo) {
 	if h1, h2, err = s.GenerateTorrentInfoHash(t.Data, d.CalculateV2); err == nil {
 		var con *sql.DB
 		if con, err = sql.Open(d.Driver, d.Address); err == nil {
+			defer con.Close()
 			err = d.ExecDB(con, t.Name, h1, h2)
 		}
 	}
