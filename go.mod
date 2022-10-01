@@ -15,7 +15,7 @@ require (
 	github.com/zeebo/bencode v1.0.0
 	golang.org/x/image v0.0.0-20220902085622-e7cb96979f69
 	sot-te.ch/HTExtractor v0.1.2
-	sot-te.ch/MTHelper v0.2.0
+	sot-te.ch/MTHelper v0.2.2
 )
 
 require (
