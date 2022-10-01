@@ -32,7 +32,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -70,7 +69,7 @@ func (Notifier) New(configPath string, _ s.Database) (producer.Producer, error) 
 	var err error
 	n := new(Notifier)
 	var confBytes []byte
-	if confBytes, err = ioutil.ReadFile(filepath.Clean(configPath)); err == nil {
+	if confBytes, err = os.ReadFile(filepath.Clean(configPath)); err == nil {
 		if err = json.Unmarshal(confBytes, n); err == nil {
 			var stat os.FileInfo
 			if stat, err = os.Stat(filepath.Dir(n.NameTemplate)); err == nil {
@@ -104,7 +103,7 @@ func (fl Notifier) Send(_ bool, torrent *s.TorrentInfo) {
 		TmplHash:         base64.RawURLEncoding.EncodeToString(hash.Sum(nil)),
 	}); err == nil {
 		if fileName = filepath.Clean(fileName); len(fileName) > 0 {
-			err = ioutil.WriteFile(fileName, torrent.Data, os.FileMode(fl.perm))
+			err = os.WriteFile(fileName, torrent.Data, os.FileMode(fl.perm))
 		} else {
 			err = errors.New("filename is empty")
 		}

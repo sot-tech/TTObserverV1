@@ -35,7 +35,7 @@ import (
 	_ "image/gif"
 	"image/jpeg"
 	_ "image/png"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -102,7 +102,7 @@ func GetTorrent(url string) (*TorrentInfo, error) {
 			if resp, err = http.Get(url); err == nil && resp != nil && resp.StatusCode < 400 {
 				resp.Close = true
 				defer resp.Body.Close()
-				if data, err = ioutil.ReadAll(resp.Body); err == nil {
+				if data, err = io.ReadAll(resp.Body); err == nil {
 					torrent := new(Torrent)
 					if err = bencode.DecodeBytes(data, torrent); err == nil {
 						res = &TorrentInfo{
@@ -154,7 +154,7 @@ func GetTorrentPoster(imageUrl string, maxSize uint) ([]byte, error) {
 					}
 				}
 			} else {
-				torrentImage, err = ioutil.ReadAll(resp.Body)
+				torrentImage, err = io.ReadAll(resp.Body)
 			}
 
 		} else {

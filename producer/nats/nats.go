@@ -31,7 +31,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -52,7 +52,7 @@ const (
 )
 
 func init() {
-	producer.RegisterFactory("nats", Notifier{})
+	producer.RegisterFactory("nats", new(Notifier))
 }
 
 type Notifier struct {
@@ -123,11 +123,11 @@ func (nc *Notifier) init() error {
 	return err
 }
 
-func (nc Notifier) New(configPath string, db s.Database) (producer.Producer, error) {
+func (*Notifier) New(configPath string, db s.Database) (producer.Producer, error) {
 	var err error
 	n := &Notifier{db: db}
 	var confBytes []byte
-	if confBytes, err = ioutil.ReadFile(filepath.Clean(configPath)); err == nil {
+	if confBytes, err = os.ReadFile(filepath.Clean(configPath)); err == nil {
 		if err = json.Unmarshal(confBytes, n); err == nil {
 			err = n.init()
 		}
@@ -135,7 +135,7 @@ func (nc Notifier) New(configPath string, db s.Database) (producer.Producer, err
 	return n, err
 }
 
-func (nc Notifier) Send(_ bool, torrent *s.TorrentInfo) {
+func (nc *Notifier) Send(_ bool, torrent *s.TorrentInfo) {
 	var err error
 	bb := new(bytes.Buffer)
 	enc := gob.NewEncoder(bb)
@@ -161,4 +161,4 @@ func (nc *Notifier) Close() {
 	}
 }
 
-func (nc Notifier) SendNxGet(uint) {}
+func (*Notifier) SendNxGet(uint) {}

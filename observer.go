@@ -31,7 +31,7 @@ import (
 	"errors"
 	"fmt"
 	"html"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -90,7 +90,7 @@ var (
 
 func ReadConfig(path string) (*Observer, error) {
 	var config Observer
-	confData, err := ioutil.ReadFile(filepath.Clean(path))
+	confData, err := os.ReadFile(filepath.Clean(path))
 	if err == nil {
 		err = json.Unmarshal(confData, &config)
 	}
@@ -126,7 +126,7 @@ func (cr *Observer) Init() error {
 	return err
 }
 
-func (cr Observer) Engage() {
+func (cr *Observer) Engage() {
 	var err error
 	var nextOffset uint
 	for nextOffset, err = cr.db.GetCrawlOffset(); err == nil; nextOffset, err = cr.db.GetCrawlOffset() {
@@ -165,7 +165,7 @@ func (cr *Observer) Close() {
 	}
 }
 
-func (cr Observer) CheckTorrent(offset uint) bool {
+func (cr *Observer) CheckTorrent(offset uint) bool {
 	var res bool
 	logger.Debug("Checking offset ", offset)
 	fullContext := fmt.Sprintf(cr.Crawler.ContextURL, offset)
@@ -211,7 +211,7 @@ func (cr Observer) CheckTorrent(offset uint) bool {
 	return res
 }
 
-func (cr Observer) Notify(torrent *s.TorrentInfo, context string, isNew bool) {
+func (cr *Observer) Notify(torrent *s.TorrentInfo, context string, isNew bool) {
 	if torrent != nil {
 		var err error
 		var upstreamMeta, existingMeta map[string]string

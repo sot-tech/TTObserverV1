@@ -31,7 +31,7 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -49,7 +49,7 @@ var (
 )
 
 func init() {
-	producer.RegisterFactory("stan", Notifier{})
+	producer.RegisterFactory("stan", new(Notifier))
 }
 
 type Notifier struct {
@@ -96,14 +96,14 @@ func (st *Notifier) init() error {
 	return err
 }
 
-func (st Notifier) New(configPath string, db s.Database) (producer.Producer, error) {
+func (*Notifier) New(configPath string, db s.Database) (producer.Producer, error) {
 	var err error
 	n := &Notifier{
 		db:              db,
 		reconnectWaiter: &sync.WaitGroup{},
 	}
 	var confBytes []byte
-	if confBytes, err = ioutil.ReadFile(filepath.Clean(configPath)); err == nil {
+	if confBytes, err = os.ReadFile(filepath.Clean(configPath)); err == nil {
 		if err = json.Unmarshal(confBytes, n); err == nil {
 			if len(n.ClusterId) > 0 && len(n.ClientId) > 0 && len(n.URL) > 0 {
 				err = n.init()
@@ -115,7 +115,7 @@ func (st Notifier) New(configPath string, db s.Database) (producer.Producer, err
 	return n, err
 }
 
-func (st Notifier) Send(_ bool, torrent *s.TorrentInfo) {
+func (st *Notifier) Send(_ bool, torrent *s.TorrentInfo) {
 	var err error
 	bb := new(bytes.Buffer)
 	enc := gob.NewEncoder(bb)
@@ -141,4 +141,4 @@ func (st *Notifier) Close() {
 	}
 }
 
-func (Notifier) SendNxGet(uint) {}
+func (*Notifier) SendNxGet(uint) {}

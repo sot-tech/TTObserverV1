@@ -36,10 +36,9 @@ const InvalidDBId = -1
 type DBFactory func(map[string]any) (Database, error)
 
 var (
-	dbFactories             = make(map[string]DBFactory)
-	dbFactoriesMu           sync.Mutex
-	ErrRequiredParameters   = errors.New("required parameters not set")
-	ErrUnsupportedOperation = errors.New("unsupported operation")
+	dbFactories           = make(map[string]DBFactory)
+	dbFactoriesMu         sync.Mutex
+	ErrRequiredParameters = errors.New("required parameters not set")
 )
 
 func RegisterFactory(name string, n DBFactory) {

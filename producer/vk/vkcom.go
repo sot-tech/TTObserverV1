@@ -31,9 +31,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -89,7 +89,7 @@ func (Notifier) New(configPath string, db s.Database) (producer.Producer, error)
 	var err error
 	n := &Notifier{db: db}
 	var confBytes []byte
-	if confBytes, err = ioutil.ReadFile(filepath.Clean(configPath)); err == nil {
+	if confBytes, err = os.ReadFile(filepath.Clean(configPath)); err == nil {
 		if err = json.Unmarshal(confBytes, n); err == nil {
 			if len(n.Token) > 0 {
 				if len(n.IgnoreRegexp) == 0 {

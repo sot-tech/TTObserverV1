@@ -30,7 +30,7 @@ import (
 	"crypto/sha1"
 	"database/sql"
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/op/go-logging"
@@ -59,7 +59,7 @@ func (DB) New(path string, _ s.Database) (producer.Producer, error) {
 	var err error
 	n := new(DB)
 	var confBytes []byte
-	if confBytes, err = ioutil.ReadFile(filepath.Clean(path)); err == nil {
+	if confBytes, err = os.ReadFile(filepath.Clean(path)); err == nil {
 		if err = json.Unmarshal(confBytes, n); err == nil {
 			if len(n.Driver) > 0 && len(n.Address) > 0 && len(n.DeleteQuery) > 0 {
 				var con *sql.DB

@@ -130,7 +130,7 @@ func (cl *Cluster) asMaster() error {
 	return err
 }
 
-func (cl Cluster) noResponders(err error) bool {
+func (cl *Cluster) noResponders(err error) bool {
 	return errors.Is(err, nats.ErrNoResponders) || cl.client.IsConnected() && errors.Is(err, nats.ErrTimeout)
 }
 

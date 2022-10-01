@@ -30,7 +30,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/go-redis/redis/v8"
@@ -53,7 +53,7 @@ const (
 )
 
 func init() {
-	producer.RegisterFactory("redis", Notifier{})
+	producer.RegisterFactory("redis", new(Notifier))
 }
 
 type Notifier struct {
@@ -66,11 +66,11 @@ type Notifier struct {
 	con           *redis.Client
 }
 
-func (r Notifier) New(configPath string, _ s.Database) (producer.Producer, error) {
+func (*Notifier) New(configPath string, _ s.Database) (producer.Producer, error) {
 	var err error
 	n := new(Notifier)
 	var confBytes []byte
-	if confBytes, err = ioutil.ReadFile(filepath.Clean(configPath)); err == nil {
+	if confBytes, err = os.ReadFile(filepath.Clean(configPath)); err == nil {
 		if err = json.Unmarshal(confBytes, n); err == nil {
 			if len(n.Address) > 0 && len(n.HashKey) > 0 {
 				n.con = redis.NewClient(&redis.Options{
@@ -91,7 +91,7 @@ func (r Notifier) New(configPath string, _ s.Database) (producer.Producer, error
 	return n, err
 }
 
-func (r Notifier) Send(isNew bool, t *s.TorrentInfo) {
+func (r *Notifier) Send(isNew bool, t *s.TorrentInfo) {
 	torrentNameKey := r.NameKeyPrefix + t.Name
 	if !isNew {
 		if prevHashes, err := r.con.HMGet(ctx, torrentNameKey, v1Field, v2Field, hybridField).Result(); err != nil {
@@ -144,4 +144,4 @@ func (r *Notifier) Close() {
 	}
 }
 
-func (Notifier) SendNxGet(uint) {}
+func (*Notifier) SendNxGet(uint) {}

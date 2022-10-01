@@ -30,7 +30,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -60,7 +59,7 @@ var (
 )
 
 func init() {
-	producer.RegisterFactory("telegram", Notifier{})
+	producer.RegisterFactory("telegram", new(Notifier))
 }
 
 type messageTemplates struct {
@@ -95,7 +94,7 @@ type Notifier struct {
 	errUnauthorized error
 }
 
-func (tg Notifier) getChats(chat int64, admins bool) error {
+func (tg *Notifier) getChats(chat int64, admins bool) error {
 	var err error
 	var resp string
 	var isAdmin bool
@@ -135,7 +134,7 @@ func (tg Notifier) getChats(chat int64, admins bool) error {
 	return err
 }
 
-func (tg Notifier) getState(chat int64) (string, error) {
+func (tg *Notifier) getState(chat int64) (string, error) {
 	var err error
 	var isMob, isAdmin bool
 	var index uint
@@ -155,7 +154,7 @@ func (tg Notifier) getState(chat int64) (string, error) {
 	})
 }
 
-func (tg Notifier) uploadPoster(chat int64, args []string) error {
+func (tg *Notifier) uploadPoster(chat int64, args []string) error {
 	var err error
 	var isAdmin bool
 	if isAdmin, err = tg.db.GetAdminExist(chat); isAdmin {
@@ -239,7 +238,7 @@ func (tg *Notifier) init() error {
 	return err
 }
 
-func (tg Notifier) sendMsgToMobs(msg string, photo []byte) {
+func (tg *Notifier) sendMsgToMobs(msg string, photo []byte) {
 	var chats []int64
 	var err error
 	if chats, err = tg.db.GetChats(); err != nil {
@@ -252,7 +251,7 @@ func (tg Notifier) sendMsgToMobs(msg string, photo []byte) {
 			ext += exts[1]
 		}
 		var tmpFile *os.File
-		if tmpFile, err = ioutil.TempFile("", ext); err == nil {
+		if tmpFile, err = os.CreateTemp("", ext); err == nil {
 			if _, err = tmpFile.Write(photo); err == nil {
 				_ = tmpFile.Sync()
 				photoParams.Path = tmpFile.Name()
@@ -270,11 +269,11 @@ func (tg Notifier) sendMsgToMobs(msg string, photo []byte) {
 	}
 }
 
-func (Notifier) New(configPath string, db s.Database) (producer.Producer, error) {
+func (*Notifier) New(configPath string, db s.Database) (producer.Producer, error) {
 	var err error
 	n := &Notifier{db: db}
 	var confBytes []byte
-	if confBytes, err = ioutil.ReadFile(filepath.Clean(configPath)); err == nil {
+	if confBytes, err = os.ReadFile(filepath.Clean(configPath)); err == nil {
 		if err = json.Unmarshal(confBytes, n); err == nil {
 			if err = n.init(); err == nil {
 				go n.client.HandleUpdates()
@@ -284,7 +283,7 @@ func (Notifier) New(configPath string, db s.Database) (producer.Producer, error)
 	return n, err
 }
 
-func (tg Notifier) Send(new bool, torrent *s.TorrentInfo) {
+func (tg *Notifier) Send(new bool, torrent *s.TorrentInfo) {
 	if tg.Messages.Announce == "" {
 		logger.Warning("Announce message not set")
 	} else {
@@ -320,7 +319,7 @@ func (tg Notifier) Send(new bool, torrent *s.TorrentInfo) {
 	}
 }
 
-func (tg Notifier) SendNxGet(offset uint) {
+func (tg *Notifier) SendNxGet(offset uint) {
 	if len(tg.Messages.Nx) == 0 {
 		logger.Warning("Nx message not set")
 	} else {

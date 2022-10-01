@@ -82,7 +82,7 @@ func New(configs []Config, db tts.Database) (*Announcer, error) {
 	return a, err
 }
 
-func (a Announcer) Send(new bool, torrent *tts.TorrentInfo) {
+func (a *Announcer) Send(new bool, torrent *tts.TorrentInfo) {
 	if torrent != nil {
 		for _, n := range a.producers {
 			go n.Send(new, torrent)
@@ -90,7 +90,7 @@ func (a Announcer) Send(new bool, torrent *tts.TorrentInfo) {
 	}
 }
 
-func (a Announcer) SendNxGet(offset uint) {
+func (a *Announcer) SendNxGet(offset uint) {
 	for _, n := range a.producers {
 		go n.SendNxGet(offset)
 	}
