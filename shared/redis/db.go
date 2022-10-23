@@ -101,15 +101,15 @@ func init() {
 	})
 }
 
-func (d *database) AddAdmin(id int64) error {
-	return d.con.SAdd(ctx, sAdmin, strconv.FormatInt(id, 10)).Err()
+func (d database) AddAdmin(id int64) error {
+	return d.con.SAdd(ctx, sAdmin, id).Err()
 }
 
-func (d *database) AddChat(chat int64) error {
-	return d.con.SAdd(ctx, sChat, strconv.FormatInt(chat, 10)).Err()
+func (d database) AddChat(chat int64) error {
+	return d.con.SAdd(ctx, sChat, chat).Err()
 }
 
-func (d *database) AddTorrentImage(id int64, image []byte) (err error) {
+func (d database) AddTorrentImage(id int64, image []byte) (err error) {
 	if len(image) > 0 {
 		var hash string
 		if hash, err = d.con.HGet(ctx, hTorrentId, strconv.FormatInt(id, 10)).Result(); err == nil || asNil(err) == nil {
@@ -124,7 +124,7 @@ func (d *database) AddTorrentImage(id int64, image []byte) (err error) {
 	return
 }
 
-func (d *database) AddTorrentMeta(id int64, meta map[string]string) (err error) {
+func (d database) AddTorrentMeta(id int64, meta map[string]string) (err error) {
 	l := len(meta)
 	if l > 0 {
 		m := make(map[string]any, l)
@@ -136,7 +136,7 @@ func (d *database) AddTorrentMeta(id int64, meta map[string]string) (err error) 
 	return
 }
 
-func (d *database) tx(txf func(tx redis.Pipeliner) error) (err error) {
+func (d database) tx(txf func(tx redis.Pipeliner) error) (err error) {
 	if pipe, txErr := d.con.TxPipelined(ctx, txf); txErr == nil {
 		errs := make([]string, 0)
 		for _, c := range pipe {
@@ -153,7 +153,7 @@ func (d *database) tx(txf func(tx redis.Pipeliner) error) (err error) {
 	return
 }
 
-func (d *database) AddTorrent(name string, data []byte, files []string) (int64, error) {
+func (d database) AddTorrent(name string, data []byte, files []string) (int64, error) {
 	id := new(int64)
 	err := d.tx(func(tx redis.Pipeliner) (err error) {
 		hkey := hTorrent + name
@@ -190,35 +190,35 @@ func (d *database) AddTorrent(name string, data []byte, files []string) (int64, 
 	return *id, err
 }
 
-func (d *database) CheckTorrent(id int64) (bool, error) {
+func (d database) CheckTorrent(id int64) (bool, error) {
 	exist, err := d.con.HExists(ctx, hTorrentId, strconv.FormatInt(id, 10)).Result()
 	return exist, asNil(err)
 }
 
-func (d *database) Close() {
+func (d database) Close() {
 	if d.con != nil {
 		_ = d.con.Close()
 	}
 }
 
-func (d *database) DelAdmin(id int64) error {
-	return asNil(d.con.SRem(ctx, sAdmin, strconv.FormatInt(id, 10)).Err())
+func (d database) DelAdmin(id int64) error {
+	return asNil(d.con.SRem(ctx, sAdmin, id).Err())
 }
 
-func (d *database) DelChat(chat int64) error {
-	return asNil(d.con.SRem(ctx, sChat, strconv.FormatInt(chat, 10)).Err())
+func (d database) DelChat(chat int64) error {
+	return asNil(d.con.SRem(ctx, sChat, chat).Err())
 }
 
-func (d *database) GetAdminExist(chat int64) (bool, error) {
-	isMember, err := d.con.SIsMember(ctx, sAdmin, strconv.FormatInt(chat, 10)).Result()
+func (d database) GetAdminExist(chat int64) (bool, error) {
+	isMember, err := d.con.SIsMember(ctx, sAdmin, chat).Result()
 	return isMember, asNil(err)
 }
 
-func (d *database) GetAdmins() (out []int64, err error) {
+func (d database) GetAdmins() (out []int64, err error) {
 	return d.getIntList(sAdmin)
 }
 
-func (d *database) getIntList(hash string) (out []int64, err error) {
+func (d database) getIntList(hash string) (out []int64, err error) {
 	var ints []string
 	if ints, err = d.con.SMembers(ctx, hash).Result(); err == nil {
 		if l := len(ints); l > 0 {
@@ -238,27 +238,27 @@ func (d *database) getIntList(hash string) (out []int64, err error) {
 	return
 }
 
-func (d *database) GetChatExist(chat int64) (bool, error) {
-	exist, err := d.con.SIsMember(ctx, sChat, strconv.FormatInt(chat, 10)).Result()
+func (d database) GetChatExist(chat int64) (bool, error) {
+	exist, err := d.con.SIsMember(ctx, sChat, chat).Result()
 	return exist, asNil(err)
 }
 
-func (d *database) GetChats() ([]int64, error) {
+func (d database) GetChats() ([]int64, error) {
 	out, err := d.getIntList(sChat)
 	return out, err
 }
 
-func (d *database) GetCrawlOffset() (uint, error) {
+func (d database) GetCrawlOffset() (uint, error) {
 	out, err := d.con.Get(ctx, kConfOffset).Uint64()
 	return uint(out), asNil(err)
 }
 
-func (d *database) GetTorrentFiles(id int64) ([]string, error) {
+func (d database) GetTorrentFiles(id int64) ([]string, error) {
 	out, err := d.con.SMembers(ctx, hTorrentFile+strconv.FormatInt(id, 10)).Result()
 	return out, asNil(err)
 }
 
-func (d *database) GetTorrentImage(id int64) ([]byte, error) {
+func (d database) GetTorrentImage(id int64) ([]byte, error) {
 	var data []byte
 	hash, err := d.con.HGet(ctx, hTorrentId, strconv.FormatInt(id, 10)).Result()
 	err = asNil(err)
@@ -273,12 +273,12 @@ func (d *database) GetTorrentImage(id int64) ([]byte, error) {
 	return data, err
 }
 
-func (d *database) GetTorrentMeta(id int64) (map[string]string, error) {
+func (d database) GetTorrentMeta(id int64) (map[string]string, error) {
 	out, err := d.con.HGetAll(ctx, hTorrentMeta+strconv.FormatInt(id, 10)).Result()
 	return out, asNil(err)
 }
 
-func (d *database) GetTorrent(name string) (id int64, err error) {
+func (d database) GetTorrent(name string) (id int64, err error) {
 	id = s.InvalidDBId
 	var sid string
 	if sid, err = d.con.HGet(ctx, hTorrent+name, fIndex).Result(); err == nil {
@@ -289,14 +289,13 @@ func (d *database) GetTorrent(name string) (id int64, err error) {
 	return
 }
 
-func (d *database) UpdateCrawlOffset(offset uint) error {
-	return d.con.Set(ctx, kConfOffset, strconv.FormatUint(uint64(offset), 10), 0).Err()
+func (d database) UpdateCrawlOffset(offset uint) error {
+	return d.con.Set(ctx, kConfOffset, offset, 0).Err()
 }
 
-func (d *database) MGetTorrents() (tt []s.DBTorrent, err error) {
+func (d database) MGetTorrents() (tt []s.DBTorrent, err error) {
 	var tMap map[string]string
 	if tMap, err = d.con.HGetAll(ctx, hTorrentId).Result(); asNil(err) == nil {
-
 		for sid, hKey := range tMap {
 			id, _ := strconv.ParseInt(sid, 10, 64)
 			t := s.DBTorrent{Id: id}
@@ -316,7 +315,7 @@ func (d *database) MGetTorrents() (tt []s.DBTorrent, err error) {
 	return
 }
 
-func (d *database) MPutTorrent(t s.DBTorrent, fs []string) error {
+func (d database) MPutTorrent(t s.DBTorrent, fs []string) error {
 	return d.tx(func(tx redis.Pipeliner) (err error) {
 		hKey := hTorrent + t.Name
 		if err = d.con.HSet(ctx, hKey, fName, t.Name, fData, t.Data, fImage, t.Image).Err(); err == nil {

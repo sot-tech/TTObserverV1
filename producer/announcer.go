@@ -82,10 +82,10 @@ func New(configs []Config, db tts.Database) (*Announcer, error) {
 	return a, err
 }
 
-func (a *Announcer) Send(new bool, torrent *tts.TorrentInfo) {
+func (a *Announcer) Send(isNew bool, torrent *tts.TorrentInfo) {
 	if torrent != nil {
 		for _, n := range a.producers {
-			go n.Send(new, torrent)
+			go n.Send(isNew, torrent)
 		}
 	}
 }

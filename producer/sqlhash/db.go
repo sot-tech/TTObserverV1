@@ -39,9 +39,7 @@ import (
 	s "sot-te.ch/TTObserverV1/shared"
 )
 
-var (
-	logger = logging.MustGetLogger("sqlhash")
-)
+var logger = logging.MustGetLogger("sqlhash")
 
 func init() {
 	producer.RegisterFactory("sqlhash", DB{})

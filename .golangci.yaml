@@ -1,0 +1,43 @@
+---
+run:
+    go: "1.17"
+    timeout: "5m"
+output:
+    sort-results: true
+linters-settings:
+    goimports:
+        local-prefixes: "sot-te.ch/TTObserverV1"
+    staticcheck:
+        checks:
+            - "all"
+    gosec:
+        excludes:
+            - "G401"  # Allow SHA1 usage
+            - "G404"  # Allow the usage of math/rand
+            - "G505"  # Allow SHA1 usage
+linters:
+    enable:
+        - "bidichk"
+        - "bodyclose"
+        - "errcheck"
+        - "errname"
+        - "errorlint"
+        - "gofumpt"
+        - "goimports"
+        - "goprintffuncname"
+        - "gosec"
+        - "gosimple"
+        - "govet"
+        - "importas"
+        - "ineffassign"
+        - "makezero"
+        - "prealloc"
+        - "predeclared"
+        - "rowserrcheck"
+        - "staticcheck"
+        - "tenv"
+        - "typecheck"
+        - "unconvert"
+        - "unused"
+        - "wastedassign"
+        - "whitespace"

@@ -94,12 +94,12 @@ func GetTorrent(url string) (*TorrentInfo, error) {
 	var res *TorrentInfo
 	var err error
 	var resp *http.Response
-	if resp, err = http.Head(url); err == nil && resp != nil {
+	if resp, err = http.Head(url); err == nil && resp != nil { // nolint:gosec
 		resp.Close = true
 		_ = resp.Body.Close()
 		if resp.StatusCode < 400 {
 			var data []byte
-			if resp, err = http.Get(url); err == nil && resp != nil && resp.StatusCode < 400 {
+			if resp, err = http.Get(url); err == nil && resp != nil && resp.StatusCode < 400 { // nolint:gosec
 				resp.Close = true
 				defer resp.Body.Close()
 				if data, err = io.ReadAll(resp.Body); err == nil {
@@ -139,7 +139,7 @@ func GetTorrentPoster(imageUrl string, maxSize uint) ([]byte, error) {
 	var err error
 	var torrentImage []byte
 	if len(imageUrl) > 0 {
-		if resp, httpErr := http.Get(imageUrl); httpErr == nil && resp != nil && resp.StatusCode < 400 {
+		if resp, httpErr := http.Get(imageUrl); httpErr == nil && resp != nil && resp.StatusCode < 400 { // nolint:gosec
 			resp.Close = true
 			defer resp.Body.Close()
 			if maxSize > 0 {
@@ -156,7 +156,6 @@ func GetTorrentPoster(imageUrl string, maxSize uint) ([]byte, error) {
 			} else {
 				torrentImage, err = io.ReadAll(resp.Body)
 			}
-
 		} else {
 			err = buildError(resp, httpErr, "get poster")
 		}
@@ -209,7 +208,6 @@ func GenerateTorrentInfoHash(data []byte, v2 bool) (h1, h2 []byte, err error) {
 			h.Write(torrent.Info)
 			h2 = h.Sum(nil)
 		}
-
 	}
 	return
 }

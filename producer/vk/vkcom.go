@@ -50,10 +50,12 @@ const (
 	msgTags = "tags"
 )
 
-var logger = logging.MustGetLogger("vk")
-var nonLetterNumberSpaceRegexp = regexp.MustCompile(`(?m)[^\p{L}\p{N}_\s]`)
-var isEmptyRegexp = regexp.MustCompile("^$")
-var allSpacesRegexp = regexp.MustCompile(`(?m)\s`)
+var (
+	logger                     = logging.MustGetLogger("vk")
+	nonLetterNumberSpaceRegexp = regexp.MustCompile(`(?m)[^\p{L}\p{N}_\s]`)
+	isEmptyRegexp              = regexp.MustCompile("^$")
+	allSpacesRegexp            = regexp.MustCompile(`(?m)\s`)
+)
 
 func init() {
 	producer.RegisterFactory("vkcom", Notifier{})
@@ -242,6 +244,7 @@ func (vk Notifier) Send(isNew bool, torrent *s.TorrentInfo) {
 		logger.Warning("Announce message not set")
 	}
 }
+
 func (vk Notifier) SendNxGet(offset uint) {
 	if len(vk.Messages.Nx) > 0 {
 		if vk.client != nil {

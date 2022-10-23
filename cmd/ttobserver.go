@@ -31,7 +31,6 @@ import (
 	"flag"
 	"io"
 	"math/rand"
-	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -39,7 +38,7 @@ import (
 
 	"github.com/op/go-logging"
 
-	"sot-te.ch/TTObserverV1"
+	tto "sot-te.ch/TTObserverV1"
 )
 
 var logger = logging.MustGetLogger("main")
@@ -64,7 +63,7 @@ func main() {
 	f := flag.String("f", "", "Driver name from what database extract data. Supported values: sqlite3, redis, postgres")
 	t := flag.String("t", "", "Driver name to what database import data. Supported values: sqlite3, redis, postgres")
 	flag.Parse()
-	tt, err := TTObserver.ReadConfig(*configPath)
+	tt, err := tto.ReadConfig(*configPath)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -72,7 +71,7 @@ func main() {
 	if tt.Log.File == "" {
 		outputWriter = os.Stdout
 	} else {
-		outputWriter, err = os.OpenFile(tt.Log.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0640)
+		outputWriter, err = os.OpenFile(tt.Log.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o640)
 	}
 	if err == nil {
 		backend := logging.AddModuleLevel(
@@ -103,7 +102,7 @@ func main() {
 	}
 }
 
-func start(tt *TTObserver.Observer) {
+func start(tt *tto.Observer) {
 	if err := tt.Init(); err == nil {
 		ch := make(chan os.Signal, 2)
 		go func() {
@@ -121,7 +120,7 @@ func start(tt *TTObserver.Observer) {
 	}
 }
 
-func startClustered(tt *TTObserver.Observer) {
+func startClustered(tt *tto.Observer) {
 	tt.Cluster.StartFn = func() (err error) {
 		if err = tt.Init(); err == nil {
 			tt.Engage()

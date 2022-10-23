@@ -29,11 +29,11 @@ package main
 import (
 	"sort"
 
-	"sot-te.ch/TTObserverV1"
+	tto "sot-te.ch/TTObserverV1"
 	s "sot-te.ch/TTObserverV1/shared"
 )
 
-func migrate(tt *TTObserver.Observer, from, to string) {
+func migrate(tt *tto.Observer, from, to string) {
 	var err error
 	var oldDb, newDb s.Database
 	if oldDb, err = s.Connect(from, tt.DB.Parameters); err != nil {

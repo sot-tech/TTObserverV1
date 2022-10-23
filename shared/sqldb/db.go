@@ -112,7 +112,7 @@ type database struct {
 	con *sql.DB
 }
 
-func (db *database) checkConnection() error {
+func (db database) checkConnection() error {
 	var err error
 	if db.con == nil {
 		err = errors.New("connection not initialized")
@@ -122,7 +122,7 @@ func (db *database) checkConnection() error {
 	return err
 }
 
-func (db *database) getNotEmpty(query string, args ...any) (bool, error) {
+func (db database) getNotEmpty(query string, args ...any) (bool, error) {
 	val := false
 	var err error
 	err = db.checkConnection()
@@ -131,17 +131,17 @@ func (db *database) getNotEmpty(query string, args ...any) (bool, error) {
 		rows, err = db.con.Query(query, args...)
 		if err == nil && rows != nil {
 			defer rows.Close()
-			val = rows.Next()
+			val, err = rows.Next(), rows.Err()
 		}
 	}
 	return val, err
 }
 
-func (db *database) GetChatExist(chat int64) (bool, error) {
+func (db database) GetChatExist(chat int64) (bool, error) {
 	return db.getNotEmpty(existChat, chat)
 }
 
-func (db *database) execNoResult(query string, args ...any) error {
+func (db database) execNoResult(query string, args ...any) error {
 	var err error
 	err = db.checkConnection()
 	if err == nil {
@@ -150,9 +150,7 @@ func (db *database) execNoResult(query string, args ...any) error {
 	return err
 }
 
-func (db *database) getIntArray(query string, args ...any) ([]int64, error) {
-	arr := make([]int64, 0)
-	var err error
+func (db database) getIntArray(query string, args ...any) (arr []int64, err error) {
 	err = db.checkConnection()
 	if err == nil {
 		var rows *sql.Rows
@@ -161,22 +159,25 @@ func (db *database) getIntArray(query string, args ...any) ([]int64, error) {
 			defer rows.Close()
 			for rows.Next() {
 				var element int64
-				if err := rows.Scan(&element); err == nil {
+				if err = rows.Scan(&element); err == nil {
 					arr = append(arr, element)
 				} else {
 					break
 				}
 			}
+			if err == nil {
+				err = rows.Err()
+			}
 		}
 	}
-	return arr, err
+	return
 }
 
-func (db *database) GetChats() ([]int64, error) {
+func (db database) GetChats() ([]int64, error) {
 	return db.getIntArray(selectChats)
 }
 
-func (db *database) AddChat(chat int64) error {
+func (db database) AddChat(chat int64) error {
 	var exist bool
 	var err error
 	if exist, err = db.GetChatExist(chat); err == nil && !exist {
@@ -185,19 +186,19 @@ func (db *database) AddChat(chat int64) error {
 	return err
 }
 
-func (db *database) DelChat(chat int64) error {
+func (db database) DelChat(chat int64) error {
 	return db.execNoResult(delChat, chat)
 }
 
-func (db *database) GetAdmins() ([]int64, error) {
+func (db database) GetAdmins() ([]int64, error) {
 	return db.getIntArray(selectAdmins)
 }
 
-func (db *database) GetAdminExist(chat int64) (bool, error) {
+func (db database) GetAdminExist(chat int64) (bool, error) {
 	return db.getNotEmpty(existAdmin, chat)
 }
 
-func (db *database) AddAdmin(id int64) error {
+func (db database) AddAdmin(id int64) error {
 	var exist bool
 	var err error
 	if exist, err = db.GetAdminExist(id); err == nil && !exist {
@@ -206,17 +207,15 @@ func (db *database) AddAdmin(id int64) error {
 	return err
 }
 
-func (db *database) DelAdmin(id int64) error {
+func (db database) DelAdmin(id int64) error {
 	return db.execNoResult(delAdmin, id)
 }
 
-func (db *database) CheckTorrent(id int64) (bool, error) {
+func (db database) CheckTorrent(id int64) (bool, error) {
 	return db.getNotEmpty(existTorrent, id)
 }
 
-func (db *database) GetTorrent(torrent string) (int64, error) {
-	var torrentId int64
-	var err error
+func (db database) GetTorrent(torrent string) (torrentId int64, err error) {
 	torrentId = s.InvalidDBId
 	if err = db.checkConnection(); err == nil {
 		var rows *sql.Rows
@@ -226,12 +225,15 @@ func (db *database) GetTorrent(torrent string) (int64, error) {
 			if rows.Next() {
 				err = rows.Scan(&torrentId)
 			}
+			if err == nil {
+				err = rows.Err()
+			}
 		}
 	}
 	return torrentId, err
 }
 
-func (db *database) AddTorrent(name string, data []byte, files []string) (int64, error) {
+func (db database) AddTorrent(name string, data []byte, files []string) (int64, error) {
 	var err error
 	var id int64
 	if err = db.execNoResult(insertOrUpdateTorrent, name, data); err == nil {
@@ -244,9 +246,7 @@ func (db *database) AddTorrent(name string, data []byte, files []string) (int64,
 	return id, err
 }
 
-func (db *database) GetTorrentFiles(torrent int64) ([]string, error) {
-	var err error
-	files := make([]string, 0)
+func (db database) GetTorrentFiles(torrent int64) (files []string, err error) {
 	err = db.checkConnection()
 	if err == nil {
 		var rows *sql.Rows
@@ -262,12 +262,15 @@ func (db *database) GetTorrentFiles(torrent int64) ([]string, error) {
 					break
 				}
 			}
+			if err == nil {
+				err = rows.Err()
+			}
 		}
 	}
 	return files, err
 }
 
-func (db *database) getConfigValue(name string) (string, error) {
+func (db database) getConfigValue(name string) (string, error) {
 	var val string
 	var err error
 	err = db.checkConnection()
@@ -279,16 +282,19 @@ func (db *database) getConfigValue(name string) (string, error) {
 			if rows.Next() {
 				err = rows.Scan(&val)
 			}
+			if err == nil {
+				err = rows.Err()
+			}
 		}
 	}
 	return val, err
 }
 
-func (db *database) updateConfigValue(name, val string) error {
+func (db database) updateConfigValue(name, val string) error {
 	return db.execNoResult(insertOrUpdateConfig, name, val)
 }
 
-func (db *database) GetCrawlOffset() (uint, error) {
+func (db database) GetCrawlOffset() (uint, error) {
 	var res uint64
 	var val string
 	var err error
@@ -298,11 +304,11 @@ func (db *database) GetCrawlOffset() (uint, error) {
 	return uint(res), err
 }
 
-func (db *database) UpdateCrawlOffset(offset uint) error {
+func (db database) UpdateCrawlOffset(offset uint) error {
 	return db.updateConfigValue(confCrawlOffset, strconv.FormatUint(uint64(offset), 10))
 }
 
-func (db *database) GetTorrentMeta(id int64) (map[string]string, error) {
+func (db database) GetTorrentMeta(id int64) (map[string]string, error) {
 	var err error
 	meta := make(map[string]string)
 	err = db.checkConnection()
@@ -319,12 +325,15 @@ func (db *database) GetTorrentMeta(id int64) (map[string]string, error) {
 					break
 				}
 			}
+			if err == nil {
+				err = rows.Err()
+			}
 		}
 	}
 	return meta, err
 }
 
-func (db *database) AddTorrentMeta(id int64, meta map[string]string) error {
+func (db database) AddTorrentMeta(id int64, meta map[string]string) error {
 	var err error
 	for k, v := range meta {
 		if err = db.execNoResult(insertTorrentMeta, id, k, v); err != nil {
@@ -334,7 +343,7 @@ func (db *database) AddTorrentMeta(id int64, meta map[string]string) error {
 	return err
 }
 
-func (db *database) GetTorrentImage(id int64) ([]byte, error) {
+func (db database) GetTorrentImage(id int64) ([]byte, error) {
 	var err error
 	image := make([]byte, 0)
 	err = db.checkConnection()
@@ -346,22 +355,25 @@ func (db *database) GetTorrentImage(id int64) ([]byte, error) {
 			if rows.Next() {
 				err = rows.Scan(&image)
 			}
+			if err == nil {
+				err = rows.Err()
+			}
 		}
 	}
 	return image, err
 }
 
-func (db *database) AddTorrentImage(id int64, image []byte) error {
+func (db database) AddTorrentImage(id int64, image []byte) error {
 	return db.execNoResult(insertTorrentImage, image, id)
 }
 
-func (db *database) Close() {
+func (db database) Close() {
 	if db.con != nil {
 		_ = db.con.Close()
 	}
 }
 
-func (db *database) MGetTorrents() (out []s.DBTorrent, err error) {
+func (db database) MGetTorrents() (out []s.DBTorrent, err error) {
 	out = make([]s.DBTorrent, 0)
 	if err = db.checkConnection(); err == nil {
 		var rows *sql.Rows
@@ -379,13 +391,16 @@ func (db *database) MGetTorrents() (out []s.DBTorrent, err error) {
 						break
 					}
 				}
+				if err == nil {
+					err = rows.Err()
+				}
 			}
 		}
 	}
 	return
 }
 
-func (db *database) MPutTorrent(t s.DBTorrent, files []string) (err error) {
+func (db database) MPutTorrent(t s.DBTorrent, files []string) (err error) {
 	if err = db.checkConnection(); err == nil {
 		if err = db.execNoResult(insertTorrent, t.Id, t.Name, t.Data, t.Image); err == nil {
 			for _, f := range files {

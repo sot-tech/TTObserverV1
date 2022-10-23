@@ -77,7 +77,7 @@ func (Notifier) New(configPath string, _ s.Database) (producer.Producer, error) 
 					if n.nameTemplate, err = tmpl.New(fmt.Sprint("file_", rand.Uint32())).Parse(n.NameTemplate); err == nil {
 						if len(n.Permissions) == 0 {
 							logger.Warning("Permissions parameter not set, falling to 0644")
-							n.perm = 0644
+							n.perm = 0o644
 						} else {
 							n.perm, err = strconv.ParseUint(n.Permissions, 8, 32)
 						}

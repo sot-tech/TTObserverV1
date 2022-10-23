@@ -31,13 +31,14 @@ import (
 	"errors"
 	"fmt"
 	"html"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/op/go-logging"
-	"sot-te.ch/HTExtractor"
+	hte "sot-te.ch/HTExtractor"
 
 	"sot-te.ch/TTObserverV1/producer"
 	_ "sot-te.ch/TTObserverV1/producer/file"
@@ -60,17 +61,18 @@ type Observer struct {
 		Level string `json:"level"`
 	} `json:"log"`
 	Crawler struct {
-		BaseURL        string                      `json:"baseurl"`
-		ContextURL     string                      `json:"contexturl"`
-		Limit          uint64                      `json:"limit"`
-		Delay          time.Duration               `json:"delay"`
-		Threshold      uint                        `json:"threshold"`
-		Anniversary    uint                        `json:"anniversary"`
-		MetaActions    []HTExtractor.ExtractAction `json:"metaactions"`
-		MetaRetry      uint                        `json:"metaretry"`
-		ImageMetaField string                      `json:"imagemetafield"`
-		ImageThumb     uint                        `json:"imagethumb"`
-		metaExtractor  *HTExtractor.Extractor
+		BaseURL        string              `json:"baseurl"`
+		ContextURL     string              `json:"contexturl"`
+		Limit          uint64              `json:"limit"`
+		Delay          time.Duration       `json:"delay"`
+		Threshold      uint                `json:"threshold"`
+		Anniversary    uint                `json:"anniversary"`
+		MetaActions    []hte.ExtractAction `json:"metaactions"`
+		MetaRetry      uint                `json:"metaretry"`
+		ImageMetaField string              `json:"imagemetafield"`
+		ImageThumb     uint                `json:"imagethumb"`
+		metaExtractor  *hte.Extractor
+		baseURL        *url.URL
 	} `json:"crawler"`
 	Producers []producer.Config `json:"producers"`
 	DB        struct {
@@ -102,9 +104,12 @@ func (cr *Observer) Init() error {
 	if cr.db, err = s.Connect(cr.DB.Driver, cr.DB.Parameters); err != nil {
 		return err
 	}
+	if cr.Crawler.baseURL, err = url.Parse(cr.Crawler.BaseURL); err != nil {
+		return err
+	}
 	logger.Debug("Initiating meta extractor")
 	if len(cr.Crawler.MetaActions) > 0 {
-		ex := HTExtractor.New()
+		ex := hte.New()
 		if err := ex.Compile(cr.Crawler.MetaActions); err == nil {
 			ex.IterationLimit, ex.StackLimit = cr.Crawler.Limit, cr.Crawler.Limit
 			cr.Crawler.metaExtractor = ex
@@ -169,7 +174,8 @@ func (cr *Observer) CheckTorrent(offset uint) bool {
 	var res bool
 	logger.Debug("Checking offset ", offset)
 	fullContext := fmt.Sprintf(cr.Crawler.ContextURL, offset)
-	if torrent, err := s.GetTorrent(cr.Crawler.BaseURL + fullContext); err == nil {
+	fullURL := cr.Crawler.baseURL.JoinPath(fullContext).String()
+	if torrent, err := s.GetTorrent(fullURL); err == nil {
 		if torrent != nil {
 			logger.Info("New file", torrent.Name)
 			newSize := torrent.Length
@@ -197,8 +203,8 @@ func (cr *Observer) CheckTorrent(offset uint) bool {
 				if torrentId, err = cr.db.AddTorrent(torrent.Name, torrent.Data, torrent.NewFiles()); err != nil {
 					logger.Error(err)
 				}
-				torrent.Id = torrentId
-				cr.Notify(torrent, fullContext, isNew)
+				torrent.Id, torrent.URL = torrentId, fullURL
+				cr.notify(torrent, fullContext, isNew)
 				if offset > 0 && offset%cr.Crawler.Anniversary == 0 {
 					cr.producer.SendNxGet(offset)
 				}
@@ -207,75 +213,73 @@ func (cr *Observer) CheckTorrent(offset uint) bool {
 				logger.Error("Zero torrent size, offset", offset)
 			}
 		}
+	} else {
+		logger.Error(err)
 	}
 	return res
 }
 
-func (cr *Observer) Notify(torrent *s.TorrentInfo, context string, isNew bool) {
-	if torrent != nil {
-		var err error
-		var upstreamMeta, existingMeta map[string]string
-		var torrentImageUrl string
-		if cr.Crawler.metaExtractor != nil {
-			var rawMeta map[string][]byte
-			logger.Debug("Extracting meta for torrent ", torrent.Name)
-			rawMeta, err = cr.Crawler.metaExtractor.ExtractData(cr.Crawler.BaseURL, context)
-			if err != nil || len(rawMeta) == 0 {
-				logger.Error("Meta fetch error: ", err, " got meta len ", len(rawMeta))
-				if cr.Crawler.MetaRetry > 0 {
-					time.Sleep(time.Duration(cr.Crawler.MetaRetry) * time.Second)
-					rawMeta, err = cr.Crawler.metaExtractor.ExtractData(cr.Crawler.BaseURL, context)
-				}
+func (cr *Observer) notify(torrent *s.TorrentInfo, context string, isNew bool) {
+	var err error
+	var upstreamMeta, existingMeta map[string]string
+	var torrentImageUrl string
+	if cr.Crawler.metaExtractor != nil {
+		var rawMeta map[string][]byte
+		logger.Debug("Extracting meta for torrent ", torrent.Name)
+		rawMeta, err = cr.Crawler.metaExtractor.ExtractData(cr.Crawler.BaseURL, context)
+		if err != nil || len(rawMeta) == 0 {
+			logger.Error("Meta fetch error: ", err, " got meta len ", len(rawMeta))
+			if cr.Crawler.MetaRetry > 0 {
+				time.Sleep(time.Duration(cr.Crawler.MetaRetry) * time.Second)
+				rawMeta, err = cr.Crawler.metaExtractor.ExtractData(cr.Crawler.BaseURL, context)
 			}
-			if err == nil && len(rawMeta) > 0 {
-				upstreamMeta = make(map[string]string, len(rawMeta))
-				for k, v := range rawMeta {
-					if len(k) > 0 {
-						unescapedValue := strings.TrimSpace(html.UnescapeString(string(v)))
-						upstreamMeta[k] = unescapedValue
-						if k == cr.Crawler.ImageMetaField {
-							torrentImageUrl = unescapedValue
-						}
+		}
+		if err == nil && len(rawMeta) > 0 {
+			upstreamMeta = make(map[string]string, len(rawMeta))
+			for k, v := range rawMeta {
+				if len(k) > 0 {
+					unescapedValue := strings.TrimSpace(html.UnescapeString(string(v)))
+					upstreamMeta[k] = unescapedValue
+					if k == cr.Crawler.ImageMetaField {
+						torrentImageUrl = unescapedValue
 					}
 				}
 			}
 		}
-		if err != nil {
-			logger.Error(err)
-		}
-		if existingMeta, err = cr.db.GetTorrentMeta(torrent.Id); err != nil {
-			logger.Error(err)
-			existingMeta = make(map[string]string)
-		}
-		if len(upstreamMeta) > 0 {
-			logger.Debug("Updating meta")
-			if err = cr.db.AddTorrentMeta(torrent.Id, upstreamMeta); err != nil {
-				logger.Error(err)
-			}
-		} else {
-			logger.Warning("Upstream meta is empty, using cached")
-			upstreamMeta = existingMeta
-		}
-		var torrentImage []byte
-		if torrentImage, err = cr.db.GetTorrentImage(torrent.Id); err == nil {
-			if len(torrentImage) == 0 || existingMeta[cr.Crawler.ImageMetaField] != torrentImageUrl {
-				if len(torrentImageUrl) > 0 {
-					logger.Info("Reloading torrent image")
-					if !strings.Contains(torrentImageUrl, cr.Crawler.BaseURL) {
-						torrentImageUrl = cr.Crawler.BaseURL + torrentImageUrl
-					}
-					if torrentImage, err = s.GetTorrentPoster(torrentImageUrl, cr.Crawler.ImageThumb); err == nil {
-						err = cr.db.AddTorrentImage(torrent.Id, torrentImage)
-					}
-				}
-			}
-		}
-		if err != nil {
-			logger.Error(err)
-		}
-		torrent.Meta = upstreamMeta
-		torrent.Image = torrentImage
-		torrent.URL = cr.Crawler.BaseURL + context
-		cr.producer.Send(isNew, torrent)
 	}
+	if err != nil {
+		logger.Error(err)
+	}
+	if existingMeta, err = cr.db.GetTorrentMeta(torrent.Id); err != nil {
+		logger.Error(err)
+		existingMeta = make(map[string]string)
+	}
+	if len(upstreamMeta) > 0 {
+		logger.Debug("Updating meta")
+		if err = cr.db.AddTorrentMeta(torrent.Id, upstreamMeta); err != nil {
+			logger.Error(err)
+		}
+	} else {
+		logger.Warning("Upstream meta is empty, using cached")
+		upstreamMeta = existingMeta
+	}
+	var torrentImage []byte
+	if torrentImage, err = cr.db.GetTorrentImage(torrent.Id); err == nil {
+		if len(torrentImage) == 0 || existingMeta[cr.Crawler.ImageMetaField] != torrentImageUrl {
+			if len(torrentImageUrl) > 0 {
+				logger.Info("Reloading torrent image")
+				if !strings.Contains(torrentImageUrl, cr.Crawler.BaseURL) {
+					torrentImageUrl = cr.Crawler.baseURL.JoinPath(torrentImageUrl).String()
+				}
+				if torrentImage, err = s.GetTorrentPoster(torrentImageUrl, cr.Crawler.ImageThumb); err == nil {
+					err = cr.db.AddTorrentImage(torrent.Id, torrentImage)
+				}
+			}
+		}
+	}
+	if err != nil {
+		logger.Error(err)
+	}
+	torrent.Meta, torrent.Image = upstreamMeta, torrentImage
+	cr.producer.Send(isNew, torrent)
 }

@@ -283,12 +283,12 @@ func (*Notifier) New(configPath string, db s.Database) (producer.Producer, error
 	return n, err
 }
 
-func (tg *Notifier) Send(new bool, torrent *s.TorrentInfo) {
+func (tg *Notifier) Send(isNew bool, torrent *s.TorrentInfo) {
 	if tg.Messages.Announce == "" {
 		logger.Warning("Announce message not set")
 	} else {
 		action := tg.Messages.Updated
-		if new {
+		if isNew {
 			action = tg.Messages.Added
 		}
 		logger.Debugf("Announcing %s for %s", action, torrent.Name)

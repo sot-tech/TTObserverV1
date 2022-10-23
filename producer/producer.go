@@ -48,8 +48,10 @@ type Factory interface {
 	New(string, tts.Database) (Producer, error)
 }
 
-var factories = make(map[string]Factory)
-var factoriesMu sync.Mutex
+var (
+	factories   = make(map[string]Factory)
+	factoriesMu sync.Mutex
+)
 
 func RegisterFactory(name string, n Factory) {
 	factoriesMu.Lock()
