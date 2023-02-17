@@ -33,8 +33,8 @@ require (
 	github.com/xlzd/gotp v0.0.0-20220915034741-1546cf172da8 // indirect
 	github.com/zelenin/go-tdlib v0.6.0 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
-	golang.org/x/net v0.1.0 // indirect
-	golang.org/x/sys v0.1.0 // indirect
+	golang.org/x/net v0.7.0 // indirect
+	golang.org/x/sys v0.5.0 // indirect
 )
 
 replace sot-te.ch/MTHelper => ../MTHelper
