@@ -41,8 +41,8 @@ import (
 	"strings"
 
 	"github.com/minio/sha256-simd"
-	"github.com/nfnt/resize"
 	"github.com/zeebo/bencode"
+	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
 )
 
@@ -145,8 +145,30 @@ func GetTorrentPoster(imageUrl string, maxSize uint) ([]byte, error) {
 			if maxSize > 0 {
 				var img image.Image
 				if img, _, err = image.Decode(resp.Body); err == nil && img != nil {
-					if maxSize > 0 {
-						img = resize.Thumbnail(maxSize, maxSize, img, resize.Bicubic)
+					maxSize := int(maxSize)
+					origBounds := img.Bounds()
+					origX, origY := origBounds.Dx(), origBounds.Dy()
+					newX, newY := origX, origY
+
+					if maxSize < origX || maxSize < origY {
+						if origX > maxSize {
+							newY = origY * maxSize / origX
+							if newY < 1 {
+								newY = 1
+							}
+							newX = maxSize
+						}
+
+						if newY > maxSize {
+							newX = newX * maxSize / newY
+							if newX < 1 {
+								newX = 1
+							}
+							newY = maxSize
+						}
+						dst := image.NewRGBA(image.Rect(0, 0, newX, newY))
+						draw.ApproxBiLinear.Scale(dst, dst.Rect, img, origBounds, draw.Over, nil)
+						img = dst
 					}
 					imgBuffer := new(bytes.Buffer)
 					if err = jpeg.Encode(imgBuffer, img, &jpeg.Options{Quality: 90}); err == nil {

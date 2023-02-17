@@ -33,8 +33,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/op/go-logging"
+	"github.com/redis/go-redis/v9"
 
 	"sot-te.ch/TTObserverV1/producer"
 	s "sot-te.ch/TTObserverV1/shared"

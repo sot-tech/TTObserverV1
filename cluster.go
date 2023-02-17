@@ -28,6 +28,7 @@ package TTObserver
 
 import (
 	"bytes"
+	cr "crypto/rand"
 	"errors"
 	"math/rand"
 	"time"
@@ -59,7 +60,9 @@ const (
 var NodeId = make([]byte, idLen)
 
 func init() {
-	rand.Read(NodeId)
+	if _, err := cr.Read(NodeId); err != nil {
+		panic(err)
+	}
 }
 
 func (cl *Cluster) Start() error {

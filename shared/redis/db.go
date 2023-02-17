@@ -32,7 +32,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 
 	s "sot-te.ch/TTObserverV1/shared"
 )
