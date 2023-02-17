@@ -13,7 +13,7 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/zeebo/bencode v1.0.0
-	golang.org/x/image v0.1.0
+	golang.org/x/image v0.5.0
 	sot-te.ch/HTExtractor v0.1.3
 	sot-te.ch/MTHelper v0.2.2
 )
