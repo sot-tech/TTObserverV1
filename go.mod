@@ -4,7 +4,6 @@ go 1.18
 
 require (
 	github.com/azzzak/vkapi v0.0.0-20190905132831-5fc550e1c8f4
-	github.com/redis/go-redis/v9 v9.0.2
 	github.com/lib/pq v1.10.7
 	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/minio/sha256-simd v1.0.0
@@ -32,9 +31,9 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/xlzd/gotp v0.1.0 // indirect
 	github.com/zelenin/go-tdlib v0.6.0 // indirect
-	golang.org/x/crypto v0.6.0 // indirect
-	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
 )
 
 replace sot-te.ch/MTHelper => ../MTHelper
