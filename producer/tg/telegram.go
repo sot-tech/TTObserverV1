@@ -109,9 +109,9 @@ func (tg *Notifier) getChats(chat int64, admins bool) error {
 			logger.Notice("LsChats called", chat)
 			sb := strings.Builder{}
 			for _, id := range chats {
-				var title string
+				var title []string
 				if title, err = tg.client.GetChatTitle(id); err != nil {
-					title = err.Error()
+					title = append(title, err.Error())
 					err = nil
 				}
 				sb.WriteString(fmt.Sprintf("%d: %s\n", id, title))
