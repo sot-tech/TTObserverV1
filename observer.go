@@ -42,9 +42,10 @@ import (
 
 	"sot-te.ch/TTObserverV1/producer"
 	_ "sot-te.ch/TTObserverV1/producer/file"
+	_ "sot-te.ch/TTObserverV1/producer/lmdb"
 	_ "sot-te.ch/TTObserverV1/producer/nats"
 	_ "sot-te.ch/TTObserverV1/producer/redis"
-	_ "sot-te.ch/TTObserverV1/producer/sqlhash"
+	_ "sot-te.ch/TTObserverV1/producer/sqldb"
 	_ "sot-te.ch/TTObserverV1/producer/stan"
 	_ "sot-te.ch/TTObserverV1/producer/tg"
 	_ "sot-te.ch/TTObserverV1/producer/vk"

@@ -1,0 +1,6 @@
+{
+	"path": "/some/path/to/lmdb/folder",
+	"maxsize": 268435456,
+	"dbname": "TT_HASH",
+	"calculatev2": true
+}
