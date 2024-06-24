@@ -3,8 +3,8 @@ module sot-te.ch/TTObserverV1
 go 1.18
 
 require (
+	github.com/PowerDNS/lmdb-go v1.9.2
 	github.com/azzzak/vkapi v0.0.0-20190905132831-5fc550e1c8f4
-	github.com/bmatsuo/lmdb-go v1.8.0
 	github.com/lib/pq v1.10.9
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/minio/sha256-simd v1.0.1

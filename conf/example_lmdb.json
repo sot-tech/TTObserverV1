@@ -2,5 +2,8 @@
 	"path": "/some/path/to/lmdb/folder",
 	"maxsize": 268435456,
 	"dbname": "TT_HASH",
+	"keyprefix": "",
+	"asyncwrite": true,
+	"nosyncsmeta": true,
 	"calculatev2": true
 }

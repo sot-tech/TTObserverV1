@@ -33,7 +33,9 @@ import (
 	"os"
 	"path/filepath"
 
-	lmdbp "github.com/bmatsuo/lmdb-go/lmdb"
+	"github.com/PowerDNS/lmdb-go/exp/lmdbsync"
+	lmdbp "github.com/PowerDNS/lmdb-go/lmdb"
+	"github.com/minio/sha256-simd"
 	"github.com/op/go-logging"
 
 	"sot-te.ch/TTObserverV1/producer"
@@ -50,13 +52,17 @@ type conf struct {
 	Path        string
 	MaxSize     int64  `json:"maxsize"`
 	DBName      string `json:"dbname"`
+	KeyPrefix   string `json:"keyprefix"`
 	CalculateV2 bool   `json:"calculatev2"`
+	AsyncWrite  bool   `json:"asyncwrite"`
+	NoMetaSync  bool   `json:"nosyncmeta"`
 }
 
 type mdb struct {
-	*lmdbp.Env
-	dbi    *lmdbp.DBI
+	*lmdbsync.Env
+	dbi    lmdbp.DBI
 	calcV2 bool
+	prefix []byte
 }
 
 func (conf) New(path string, _ s.Database) (producer.Producer, error) {
@@ -66,37 +72,55 @@ func (conf) New(path string, _ s.Database) (producer.Producer, error) {
 	var confBytes []byte
 	if confBytes, err = os.ReadFile(filepath.Clean(path)); err == nil {
 		if err = json.Unmarshal(confBytes, cfg); err == nil {
-			if len(cfg.Path) > 0 && len(cfg.DBName) > 0 {
-				db = &mdb{calcV2: cfg.CalculateV2}
-				db.Env, err = lmdbp.NewEnv()
-				if err == nil {
-					err = db.Env.SetMaxDBs(1)
-					if cfg.MaxSize <= 0 {
-						cfg.MaxSize = 1 << 30
-					}
-					err = db.Env.SetMapSize(cfg.MaxSize)
-					if _, err = os.Stat(cfg.Path); err != nil && errors.Is(err, os.ErrNotExist) {
-						err = os.Mkdir(cfg.Path, 0700)
-					}
-				}
-				if err == nil {
-					err = db.Open(cfg.Path, 0, 0640)
-				}
-				if err == nil {
-					err = db.Update(func(txn *lmdbp.Txn) (err error) {
-						db.dbi, err = txn.CreateDBI(cfg.DBName)
-						return
-					})
-				}
-				if err != nil {
-					err = db.Env.Close()
-				}
-			} else {
-				err = s.ErrRequiredParameters
-			}
+			db, err = newDB(cfg)
 		}
 	}
 	return db, err
+}
+
+func newDB(cfg *conf) (db *mdb, err error) {
+	if len(cfg.Path) > 0 && len(cfg.DBName) > 0 {
+		db = &mdb{calcV2: cfg.CalculateV2, prefix: []byte(cfg.KeyPrefix)}
+		var lmEnv *lmdbp.Env
+		if lmEnv, err = lmdbp.NewEnv(); err == nil {
+			db.Env, err = lmdbsync.NewEnv(lmEnv,
+				lmdbsync.MapResizedHandler(lmdbsync.MapResizedDefaultRetry, lmdbsync.MapResizedDefaultDelay),
+			)
+		}
+
+		if err == nil {
+			err = db.Env.SetMaxDBs(1)
+			if cfg.MaxSize <= 0 {
+				cfg.MaxSize = 1 << 30
+			}
+			err = db.Env.SetMapSize(cfg.MaxSize)
+			if _, err = os.Stat(cfg.Path); err != nil && errors.Is(err, os.ErrNotExist) {
+				err = os.Mkdir(cfg.Path, 0700)
+			}
+		}
+		if err == nil {
+			var flags uint
+			if cfg.AsyncWrite {
+				flags |= lmdbp.WriteMap | lmdbp.MapAsync
+			}
+			if cfg.NoMetaSync {
+				flags |= lmdbp.NoMetaSync
+			}
+			err = db.Open(cfg.Path, flags, 0640)
+		}
+		if err == nil {
+			err = db.Update(func(txn *lmdbp.Txn) (err error) {
+				db.dbi, err = txn.CreateDBI(cfg.DBName)
+				return
+			})
+		}
+		if err != nil {
+			err = db.Env.Close()
+		}
+	} else {
+		err = s.ErrRequiredParameters
+	}
+	return
 }
 
 func (d *mdb) Send(_ bool, t *s.TorrentInfo) {
@@ -104,13 +128,14 @@ func (d *mdb) Send(_ bool, t *s.TorrentInfo) {
 	var h1, h2 []byte
 	if h1, h2, err = s.GenerateTorrentInfoHash(t.Data, d.calcV2); err == nil {
 		err = d.Update(func(txn *lmdbp.Txn) (err error) {
-			v := []byte(t.Name)
-			if err = txn.Put(d.dbi, h1, v, 0); err != nil {
+			v, p := []byte(t.Name), make([]byte, len(d.prefix), len(d.prefix)+sha256.Size)
+			copy(p, d.prefix)
+			if err = txn.Put(d.dbi, append(p, h1...), v, 0); err != nil {
 				return
 			}
 			if len(h2) > 0 {
-				if err = txn.Put(d.dbi, h2, v, 0); err == nil {
-					err = txn.Put(d.dbi, h2[:sha1.Size], v, 0)
+				if err = txn.Put(d.dbi, append(p, h2...), v, 0); err == nil {
+					err = txn.Put(d.dbi, append(p, h2[:sha1.Size]...), v, 0)
 				}
 			}
 			return
@@ -125,6 +150,7 @@ func (*mdb) SendNxGet(uint) {}
 
 func (d *mdb) Close() {
 	if d.Env != nil {
+		_ = d.Env.Sync(true)
 		_ = d.Env.Close()
 	}
 }
