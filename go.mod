@@ -13,7 +13,7 @@ require (
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/zeebo/bencode v1.0.0
-	golang.org/x/image v0.15.0
+	golang.org/x/image v0.18.0
 	sot-te.ch/HTExtractor v0.1.3
 	sot-te.ch/MTHelper v0.2.5
 )
