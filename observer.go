@@ -38,7 +38,7 @@ import (
 	"time"
 
 	"github.com/op/go-logging"
-	hte "sot-te.ch/HTExtractor"
+	hte "sot-te.ch/GoHTExtractor"
 
 	"sot-te.ch/TTObserverV1/producer"
 	_ "sot-te.ch/TTObserverV1/producer/file"
@@ -135,9 +135,16 @@ func (cr *Observer) Init() error {
 func (cr *Observer) Engage() {
 	var err error
 	var nextOffset uint
-	for nextOffset, err = cr.db.GetCrawlOffset(); err == nil; nextOffset, err = cr.db.GetCrawlOffset() {
+	t := time.NewTicker(cr.Crawler.Delay * time.Second)
+	defer t.Stop()
+	for err == nil {
 		select {
-		default:
+		case <-t.C:
+			nextOffset, err = cr.db.GetCrawlOffset()
+			if err != nil {
+				logger.Error(err)
+				break
+			}
 			logger.Debug("Checking upstream with offset ", nextOffset)
 			newNextOffset := nextOffset
 			for offsetToCheck := nextOffset; offsetToCheck < nextOffset+cr.Crawler.Threshold; offsetToCheck++ {
@@ -147,11 +154,10 @@ func (cr *Observer) Engage() {
 			}
 			if newNextOffset > nextOffset {
 				nextOffset = newNextOffset
-				if err = cr.db.UpdateCrawlOffset(nextOffset); err != nil {
+				if err := cr.db.UpdateCrawlOffset(nextOffset); err != nil {
 					logger.Error(err)
 				}
 			}
-			time.Sleep(cr.Crawler.Delay * time.Second)
 		case <-cr.stopped:
 			return
 		}

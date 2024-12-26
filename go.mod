@@ -1,8 +1,8 @@
 module sot-te.ch/TTObserverV1
 
-go 1.21
+go 1.22
 
-toolchain go1.23.3
+toolchain go1.23.4
 
 require (
 	github.com/PowerDNS/lmdb-go v1.9.2
@@ -16,8 +16,8 @@ require (
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/zeebo/bencode v1.0.0
 	golang.org/x/image v0.23.0
-	sot-te.ch/HTExtractor v0.1.3
 	sot-te.ch/GoMTHelper v0.2.6
+	sot-te.ch/GoHTExtractor v0.1.3
 )
 
 require (
@@ -29,19 +29,20 @@ require (
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
-	github.com/nats-io/nats-server/v2 v2.10.12 // indirect
+	github.com/nats-io/nats-server/v2 v2.10.24 // indirect
 	github.com/nats-io/nats-streaming-server v0.25.6 // indirect
 	github.com/nats-io/nkeys v0.4.9 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/stretchr/testify v1.9.0 // indirect
+	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/xlzd/gotp v0.1.0 // indirect
 	github.com/zelenin/go-tdlib v0.7.6 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/time v0.8.0 // indirect
 )
 
 replace sot-te.ch/GoMTHelper => ../mthelper
 
-replace sot-te.ch/HTExtractor => ../HTExtractor
+replace sot-te.ch/GoHTExtractor => ../htextractor

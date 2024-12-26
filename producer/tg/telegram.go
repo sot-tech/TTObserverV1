@@ -38,7 +38,7 @@ import (
 	tmpl "text/template"
 
 	"github.com/op/go-logging"
-	mt "sot-te.ch/MTHelper"
+	mt "sot-te.ch/GoMTHelper"
 
 	"sot-te.ch/TTObserverV1/producer"
 	s "sot-te.ch/TTObserverV1/shared"
@@ -201,6 +201,7 @@ func (tg *Notifier) init() error {
 		AdminRm:    tg.db.DelAdmin,
 		State:      tg.getState,
 	}
+	tg.client.SetLogger(logger)
 	if err = tg.client.LoginAsBot(tg.BotToken, mt.MtLogWarning); err == nil {
 		var subErr error
 		if subErr = tg.client.AddCommand(cmdLsChats, func(chat int64, _ string, _ []string) error {
@@ -298,7 +299,8 @@ func (tg *Notifier) Send(isNew bool, torrent *s.TorrentInfo) {
 				name = strings.Replace(name, k, v, -1)
 			}
 		}
-		newIndexes, err := producer.FormatIndexesMessage(producer.GetNewFilesIndexes(torrent.Files), tg.messages.singleIndex,
+		newIndexes, err := producer.FormatIndexesMessage(producer.GetNewFilesIndexes(torrent.Files),
+			tg.messages.singleIndex,
 			tg.messages.multipleIndexes, producer.MsgNewIndexes)
 		if err != nil {
 			logger.Error(err)
