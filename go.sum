@@ -119,6 +119,7 @@ github.com/zelenin/go-tdlib v0.7.2 h1:XpD77+t3bix62TsEZbuQeDls6QQJbcovpb8SVVfyNA
 github.com/zelenin/go-tdlib v0.7.2/go.mod h1:yqNbNZenZtXPKgf9hDuyZbsRz7qlxOxdfKOc+sAxxIE=
 github.com/zelenin/go-tdlib v0.7.4 h1:OaLBU1pJ/5VWouiU0KG8koBxYQ7r7KEWtZEfUqdxtT8=
 github.com/zelenin/go-tdlib v0.7.4/go.mod h1:yqNbNZenZtXPKgf9hDuyZbsRz7qlxOxdfKOc+sAxxIE=
+github.com/zelenin/go-tdlib v0.7.6/go.mod h1:yqNbNZenZtXPKgf9hDuyZbsRz7qlxOxdfKOc+sAxxIE=
 go.etcd.io/bbolt v1.3.8 h1:xs88BrvEv273UsB79e0hcVrlUWmS0a8upikMFhSyAtA=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=

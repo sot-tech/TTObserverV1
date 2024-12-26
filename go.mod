@@ -17,7 +17,7 @@ require (
 	github.com/zeebo/bencode v1.0.0
 	golang.org/x/image v0.23.0
 	sot-te.ch/HTExtractor v0.1.3
-	sot-te.ch/MTHelper v0.2.5
+	sot-te.ch/GoMTHelper v0.2.6
 )
 
 require (
@@ -36,12 +36,12 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/stretchr/testify v1.9.0 // indirect
 	github.com/xlzd/gotp v0.1.0 // indirect
-	github.com/zelenin/go-tdlib v0.7.4 // indirect
+	github.com/zelenin/go-tdlib v0.7.6 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 )
 
-replace sot-te.ch/MTHelper => ../mthelper
+replace sot-te.ch/GoMTHelper => ../mthelper
 
 replace sot-te.ch/HTExtractor => ../HTExtractor
