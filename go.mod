@@ -1,7 +1,6 @@
 module sot-te.ch/TTObserverV1
 
 go 1.22
-
 toolchain go1.23.4
 
 require (
@@ -16,8 +15,8 @@ require (
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/zeebo/bencode v1.0.0
 	golang.org/x/image v0.23.0
-	sot-te.ch/GoMTHelper v0.2.6
 	sot-te.ch/GoHTExtractor v0.1.3
+	sot-te.ch/GoMTHelper v0.2.6
 )
 
 require (
@@ -37,9 +36,9 @@ require (
 	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/xlzd/gotp v0.1.0 // indirect
 	github.com/zelenin/go-tdlib v0.7.6 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
-	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
 )
 
