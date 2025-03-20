@@ -1,7 +1,7 @@
 module sot-te.ch/TTObserverV1
 
 go 1.22
-toolchain go1.23.4
+toolchain go1.24.1
 
 require (
 	github.com/PowerDNS/lmdb-go v1.9.2
@@ -12,7 +12,7 @@ require (
 	github.com/nats-io/nats.go v1.38.0
 	github.com/nats-io/stan.go v0.10.4
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
-	github.com/redis/go-redis/v9 v9.7.0
+	github.com/redis/go-redis/v9 v9.7.3
 	github.com/zeebo/bencode v1.0.0
 	golang.org/x/image v0.23.0
 	sot-te.ch/GoHTExtractor v0.1.3
