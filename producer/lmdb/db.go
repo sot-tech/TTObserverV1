@@ -28,6 +28,7 @@ package lmdb
 
 import (
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"os"
@@ -35,7 +36,6 @@ import (
 
 	"github.com/PowerDNS/lmdb-go/exp/lmdbsync"
 	lmdbp "github.com/PowerDNS/lmdb-go/lmdb"
-	"github.com/minio/sha256-simd"
 	"github.com/op/go-logging"
 
 	"sot-te.ch/TTObserverV1/producer"

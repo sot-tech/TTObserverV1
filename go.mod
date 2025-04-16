@@ -9,7 +9,6 @@ require (
 	github.com/azzzak/vkapi v0.0.0-20190905132831-5fc550e1c8f4
 	github.com/lib/pq v1.10.9
 	github.com/mattn/go-sqlite3 v1.14.27
-	github.com/minio/sha256-simd v1.0.1
 	github.com/nats-io/nats.go v1.41.1
 	github.com/nats-io/stan.go v0.10.4
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
@@ -28,7 +27,6 @@ require (
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
-	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/nats-io/nats-server/v2 v2.11.1 // indirect
 	github.com/nats-io/nats-streaming-server v0.25.6 // indirect
 	github.com/nats-io/nkeys v0.4.10 // indirect

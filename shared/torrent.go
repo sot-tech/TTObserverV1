@@ -40,7 +40,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/minio/sha256-simd"
+	"crypto/sha256"
+
 	"github.com/zeebo/bencode"
 	"golang.org/x/image/draw"
 	_ "golang.org/x/image/webp"
