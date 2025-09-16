@@ -38,8 +38,10 @@ import (
 	"regexp"
 	"strings"
 	tmpl "text/template"
+	"time"
 
 	"github.com/azzzak/vkapi"
+	"github.com/go-resty/resty/v2"
 	"github.com/op/go-logging"
 
 	"sot-te.ch/TTObserverV1/producer"
@@ -101,7 +103,17 @@ func (Notifier) New(configPath string, db s.Database) (producer.Producer, error)
 				}
 				if err == nil {
 					var subErr error
-					n.client = vkapi.NewClient(n.Token)
+					n.client = &vkapi.API{
+						Token: n.Token,
+						Client: resty.New().
+							SetBaseURL("https://api.vk.ru/method").
+							SetFormData(map[string]string{
+								"access_token": n.Token,
+								"lang":         "ru",
+								"v":            "5.101",
+							}).
+							SetTimeout(15 * time.Second),
+					}
 					if n.Messages.announceTmpl, subErr = tmpl.New("announce").Parse(n.Messages.Announce); subErr != nil {
 						logger.Error(subErr)
 					}
