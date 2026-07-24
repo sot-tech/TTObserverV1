@@ -84,6 +84,7 @@ type Notifier struct {
 		Tags                map[string]bool `json:"tags"`
 		TagsSeparator       string          `json:"tagsseparator"`
 	} `json:"msg"`
+	Proxy         string `json:"proxy"`
 	client        *vkapi.API
 	ignorePattern *regexp.Regexp
 	db            s.Database
@@ -103,16 +104,20 @@ func (Notifier) New(configPath string, db s.Database) (producer.Producer, error)
 				}
 				if err == nil {
 					var subErr error
+					c := resty.New().
+						SetBaseURL("https://api.vk.ru/method").
+						SetFormData(map[string]string{
+							"access_token": n.Token,
+							"lang":         "ru",
+							"v":            "5.101",
+						}).
+						SetTimeout(15 * time.Second)
+					if len(n.Proxy) > 0 {
+						c.SetProxy(n.Proxy)
+					}
 					n.client = &vkapi.API{
-						Token: n.Token,
-						Client: resty.New().
-							SetBaseURL("https://api.vk.ru/method").
-							SetFormData(map[string]string{
-								"access_token": n.Token,
-								"lang":         "ru",
-								"v":            "5.101",
-							}).
-							SetTimeout(15 * time.Second),
+						Token:  n.Token,
+						Client: c,
 					}
 					if n.Messages.announceTmpl, subErr = tmpl.New("announce").Parse(n.Messages.Announce); subErr != nil {
 						logger.Error(subErr)
