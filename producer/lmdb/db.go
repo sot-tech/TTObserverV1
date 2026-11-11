@@ -81,41 +81,56 @@ func (conf) New(path string, _ s.Database) (producer.Producer, error) {
 func newDB(cfg *conf) (db *mdb, err error) {
 	if len(cfg.Path) > 0 && len(cfg.DBName) > 0 {
 		db = &mdb{calcV2: cfg.CalculateV2, prefix: []byte(cfg.KeyPrefix)}
-		var lmEnv *lmdbp.Env
-		if lmEnv, err = lmdbp.NewEnv(); err == nil {
-			db.Env, err = lmdbsync.NewEnv(lmEnv,
-				lmdbsync.MapResizedHandler(lmdbsync.MapResizedDefaultRetry, lmdbsync.MapResizedDefaultDelay),
-			)
+		lmEnv, err := lmdbp.NewEnv()
+		if err != nil {
+			return nil, err
+		}
+		db.Env, err = lmdbsync.NewEnv(lmEnv,
+			lmdbsync.MapResizedHandler(lmdbsync.MapResizedDefaultRetry, lmdbsync.MapResizedDefaultDelay),
+		)
+		if err != nil {
+			return nil, err
 		}
 
-		if err == nil {
-			err = db.Env.SetMaxDBs(1)
-			if cfg.MaxSize <= 0 {
-				cfg.MaxSize = 1 << 30
-			}
-			err = db.Env.SetMapSize(cfg.MaxSize)
-			if _, err = os.Stat(cfg.Path); err != nil && errors.Is(err, os.ErrNotExist) {
-				err = os.Mkdir(cfg.Path, 0700)
-			}
+		err = db.SetMaxDBs(1)
+		if err != nil {
+			_ = db.Env.Close()
+			return nil, err
 		}
-		if err == nil {
-			var flags uint
-			if cfg.AsyncWrite {
-				flags |= lmdbp.WriteMap | lmdbp.MapAsync
-			}
-			if cfg.NoMetaSync {
-				flags |= lmdbp.NoMetaSync
-			}
-			err = db.Open(cfg.Path, flags, 0640)
+		if cfg.MaxSize <= 0 {
+			cfg.MaxSize = 1 << 30
 		}
-		if err == nil {
-			err = db.Update(func(txn *lmdbp.Txn) (err error) {
-				db.dbi, err = txn.CreateDBI(cfg.DBName)
-				return
-			})
+		err = db.SetMapSize(cfg.MaxSize)
+		if err != nil {
+			_ = db.Env.Close()
+			return nil, err
+		}
+		if _, err = os.Stat(cfg.Path); err != nil && errors.Is(err, os.ErrNotExist) {
+			err = os.Mkdir(cfg.Path, 0700)
 		}
 		if err != nil {
-			err = db.Env.Close()
+			_ = db.Env.Close()
+			return nil, err
+		}
+		var flags uint
+		if cfg.AsyncWrite {
+			flags |= lmdbp.WriteMap | lmdbp.MapAsync
+		}
+		if cfg.NoMetaSync {
+			flags |= lmdbp.NoMetaSync
+		}
+		err = db.Open(cfg.Path, flags, 0640)
+		if err != nil {
+			_ = db.Env.Close()
+			return nil, err
+		}
+		err = db.Update(func(txn *lmdbp.Txn) (err error) {
+			db.dbi, err = txn.CreateDBI(cfg.DBName)
+			return
+		})
+		if err != nil {
+			_ = db.Env.Close()
+			return nil, err
 		}
 	} else {
 		err = s.ErrRequiredParameters
